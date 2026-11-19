@@ -1,15 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Department Attendance Tracker — calendar-check mark.
-     Monochrome tile matches the app theme (oklch 0.205 0 0),
-     emerald check echoes the "Present" state color used in the UI. -->
+<!-- Department Attendance Tracker — graduation-cap mark.
+     Uses the exact Lucide GraduationCap glyph shown across the app
+     (login screen, header, bottom nav, admin panel), scaled 2x onto the
+     theme's dark tile (oklch 0.205 0 0), stroked in the app's emerald accent. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <rect x="2" y="2" width="60" height="60" rx="14" fill="#1B1B1F"/>
-  <g fill="none" stroke="#FFFFFF" stroke-width="4">
-    <rect x="14" y="17" width="36" height="33" rx="6"/>
-    <line x1="22" y1="11" x2="22" y2="20" stroke-linecap="round"/>
-    <line x1="42" y1="11" x2="42" y2="20" stroke-linecap="round"/>
-    <line x1="14" y1="27" x2="50" y2="27"/>
+  <g transform="translate(8 8) scale(2)" fill="none" stroke="#34D399"
+     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/>
+    <path d="M22 10v6"/>
+    <path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>
   </g>
-  <path d="M24 38.5 L30.5 45 L41 31.5" fill="none" stroke="#34D399"
-        stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
