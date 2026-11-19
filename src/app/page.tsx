@@ -109,27 +109,28 @@ export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-2 px-4 sm:gap-3">
           <GraduationCap className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold leading-tight">
-              Department Attendance
+              <span className="sm:hidden">Attendance</span>
+              <span className="hidden sm:inline">Department Attendance</span>
             </p>
             <p className="hidden truncate text-xs text-muted-foreground sm:block">
               Student attendance tracking
             </p>
           </div>
 
-          <nav className="ml-auto flex items-center gap-1.5" aria-label="Main">
+          <nav className="ml-auto flex shrink-0 items-center gap-1.5" aria-label="Main">
             {!isStudent && view.name !== "dashboard" && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setView({ name: "dashboard" })}
               >
-                <LayoutDashboard className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                <LayoutDashboard className="h-4 w-4 sm:mr-1.5" aria-hidden="true" />
                 <span className="hidden sm:inline">Dashboard</span>
-                <span className="sm:hidden">Home</span>
+                <span className="sr-only sm:hidden">Dashboard</span>
               </Button>
             )}
             {isAdmin && view.name !== "admin" && (
@@ -137,12 +138,14 @@ export default function Home() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setView({ name: "admin" })}
+                title="Admin panel"
               >
-                <ShieldCheck className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                Admin
+                <ShieldCheck className="h-4 w-4 sm:mr-1.5" aria-hidden="true" />
+                <span className="hidden sm:inline">Admin</span>
+                <span className="sr-only sm:hidden">Admin</span>
               </Button>
             )}
-            <Separator orientation="vertical" className="mx-1 h-6" />
+            <Separator orientation="vertical" className="mx-1 hidden h-6 sm:block" />
             <div className="hidden text-right md:block">
               <p className="text-xs font-medium leading-tight">{user.name}</p>
               <p className="text-[11px] leading-tight text-muted-foreground">
@@ -218,7 +221,7 @@ export default function Home() {
         className="mt-auto border-t"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-4 py-3">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
           <p className="text-xs text-muted-foreground">
             Department of Education · Attendance System
           </p>

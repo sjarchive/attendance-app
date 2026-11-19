@@ -401,7 +401,7 @@ export function AttendanceMarker({ course, onBack }: AttendanceMarkerProps) {
               tabIndex={0}
               onKeyDown={handleKeyDown}
               aria-label="Roster list, use P, A, L or V keys to mark the focused student"
-              className="max-h-[60vh] overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+              className="overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:max-h-[60vh]"
             >
               <ul className="divide-y">
                 {roster.map((student, idx) => {
@@ -454,8 +454,10 @@ export function AttendanceMarker({ course, onBack }: AttendanceMarkerProps) {
                 · {counts.unmarked} left
               </span>
             )}
-            <span className="mx-1 text-border">|</span>
-            {formatDateLabel(date)}
+            <span className="hidden sm:inline">
+              <span className="mx-1 text-border">|</span>
+              {formatDateLabel(date)}
+            </span>
           </p>
           <Button
             onClick={handleSave}

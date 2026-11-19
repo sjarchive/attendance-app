@@ -26,7 +26,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -295,27 +294,31 @@ export function RosterManager({
 
       <Card>
         <CardHeader className="border-b">
-          <CardTitle>Student roster</CardTitle>
-          <CardDescription>
-            Add, edit, or soft-remove students. Removed students keep their
-            attendance history and can be restored.
-          </CardDescription>
-          <CardAction className="flex items-center gap-2">
-            <CsvImportDialog
-              courseId={course.id}
-              onImported={() => {
-                void loadStudents();
-                onChanged?.();
-              }}
-            />
-            <Button
-              className="bg-emerald-600 text-white hover:bg-emerald-700"
-              onClick={() => setAddOpen(true)}
-            >
-              <PlusIcon />
-              Add student
-            </Button>
-          </CardAction>
+          <div className="flex flex-col gap-3 sm:grid sm:grid-cols-[1fr_auto] sm:items-start sm:gap-1.5">
+            <div className="min-w-0 space-y-1.5">
+              <CardTitle>Student roster</CardTitle>
+              <CardDescription>
+                Add, edit, or soft-remove students. Removed students keep their
+                attendance history and can be restored.
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <CsvImportDialog
+                courseId={course.id}
+                onImported={() => {
+                  void loadStudents();
+                  onChanged?.();
+                }}
+              />
+              <Button
+                className="bg-emerald-600 text-white hover:bg-emerald-700"
+                onClick={() => setAddOpen(true)}
+              >
+                <PlusIcon />
+                Add student
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-4 md:p-6">
           {students === null && loadError ? (
@@ -354,13 +357,13 @@ export function RosterManager({
               </Button>
             </div>
           ) : (
-            <div className="max-h-96 overflow-y-auto rounded-md border">
+            <div className="overflow-auto rounded-md border sm:max-h-96">
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
-                    <TableHead>Roll No</TableHead>
+                    <TableHead className="hidden sm:table-cell">Roll No</TableHead>
                     <TableHead>Name</TableHead>
-                    <TableHead>Marked days</TableHead>
+                    <TableHead className="hidden sm:table-cell">Marked days</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -371,13 +374,16 @@ export function RosterManager({
                       key={student.studentId}
                       className={student.active ? undefined : "opacity-70"}
                     >
-                      <TableCell className="font-mono text-sm">
+                      <TableCell className="hidden font-mono text-sm sm:table-cell">
                         {student.rollNo}
                       </TableCell>
                       <TableCell className="font-medium">
-                        {student.name}
+                        <p className="leading-tight">{student.name}</p>
+                        <p className="font-mono text-xs leading-tight text-muted-foreground sm:hidden">
+                          {student.rollNo}
+                        </p>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="hidden font-mono text-sm text-muted-foreground sm:table-cell">
                         {student.markedDays}
                       </TableCell>
                       <TableCell>
@@ -398,30 +404,33 @@ export function RosterManager({
                               <Button
                                 variant="outline"
                                 size="sm"
+                                aria-label={`Edit ${student.name}`}
                                 onClick={() => openEdit(student)}
                               >
                                 <PencilIcon />
-                                Edit
+                                <span className="hidden sm:inline">Edit</span>
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
+                                aria-label={`Remove ${student.name}`}
                                 className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
                                 onClick={() => setRemoveTarget(student)}
                               >
                                 <Trash2Icon />
-                                Remove
+                                <span className="hidden sm:inline">Remove</span>
                               </Button>
                             </>
                           ) : (
                             <Button
                               variant="outline"
                               size="sm"
+                              aria-label={`Restore ${student.name}`}
                               className="text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:hover:bg-emerald-950"
                               onClick={() => void handleRestore(student)}
                             >
                               <RotateCcwIcon />
-                              Restore
+                              <span className="hidden sm:inline">Restore</span>
                             </Button>
                           )}
                         </div>

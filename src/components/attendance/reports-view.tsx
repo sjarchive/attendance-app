@@ -423,13 +423,13 @@ export function ReportsView({ course, onBack }: ReportsViewProps) {
           {/* Per-student table */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-sm">
+              <CardTitle className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
                 <ClipboardList
                   className="h-4 w-4 text-emerald-600"
                   aria-hidden="true"
                 />
                 Per-student breakdown
-                <span className="font-normal text-muted-foreground">
+                <span className="whitespace-nowrap font-normal text-muted-foreground">
                   ({rows.length} {rows.length === 1 ? "student" : "students"})
                 </span>
               </CardTitle>
@@ -458,43 +458,66 @@ export function ReportsView({ course, onBack }: ReportsViewProps) {
                   </p>
                 </div>
               ) : (
-                <div className="max-h-96 overflow-auto [&_[data-slot=table-container]]:overflow-visible">
+                <div className="overflow-auto sm:max-h-96 [&_[data-slot=table-container]]:overflow-visible">
                   <Table>
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
-                        <TableHead className="sticky top-0 z-10 bg-background pl-4">
+                        <TableHead className="sticky top-0 z-10 bg-background px-1 pl-1 sm:px-2 sm:pl-4">
                           Roll No
                         </TableHead>
-                        <TableHead className="sticky top-0 z-10 bg-background">
+                        <TableHead className="sticky top-0 z-10 bg-background px-1 sm:px-2">
                           Name
                         </TableHead>
-                        <TableHead className="sticky top-0 z-10 bg-background text-right">
-                          Present
+                        <TableHead
+                          className="sticky top-0 z-10 bg-background px-1 text-right sm:px-2"
+                          title="Present"
+                        >
+                          <span className="sm:hidden">P</span>
+                          <span className="hidden sm:inline">Present</span>
                         </TableHead>
-                        <TableHead className="sticky top-0 z-10 bg-background text-right">
-                          Absent
+                        <TableHead
+                          className="sticky top-0 z-10 bg-background px-1 text-right sm:px-2"
+                          title="Absent"
+                        >
+                          <span className="sm:hidden">A</span>
+                          <span className="hidden sm:inline">Absent</span>
                         </TableHead>
-                        <TableHead className="sticky top-0 z-10 bg-background text-right">
-                          Late
+                        <TableHead
+                          className="sticky top-0 z-10 bg-background px-1 text-right sm:px-2"
+                          title="Late"
+                        >
+                          <span className="sm:hidden">L</span>
+                          <span className="hidden sm:inline">Late</span>
                         </TableHead>
-                        <TableHead className="sticky top-0 z-10 bg-background text-right">
-                          Leave
+                        <TableHead
+                          className="sticky top-0 z-10 bg-background px-1 text-right sm:px-2"
+                          title="Leave"
+                        >
+                          <span className="sm:hidden">V</span>
+                          <span className="hidden sm:inline">Leave</span>
                         </TableHead>
-                        <TableHead className="sticky top-0 z-10 bg-background text-right">
+                        <TableHead
+                          className="hidden sticky top-0 z-10 bg-background text-right sm:table-cell"
+                          title="Marked days"
+                        >
                           Marked
                         </TableHead>
-                        <TableHead className="sticky top-0 z-10 bg-background pr-4 text-right">
-                          Attendance %
+                        <TableHead
+                          className="sticky top-0 z-10 bg-background px-1 pr-1 text-right sm:px-2 sm:pr-4"
+                          title="Attendance percentage"
+                        >
+                          <span className="sm:hidden">%</span>
+                          <span className="hidden sm:inline">Attendance %</span>
                         </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {rows.map((row: ReportRow) => (
                         <TableRow key={row.studentId}>
-                          <TableCell className="pl-4 tabular-nums">
+                          <TableCell className="px-1 pl-1 tabular-nums sm:px-2 sm:pl-4">
                             {row.rollNo}
                           </TableCell>
-                          <TableCell className="font-medium">
+                          <TableCell className="px-1 font-medium sm:px-2">
                             <span className="flex flex-wrap items-center gap-2">
                               {row.name}
                               {!row.active && (
@@ -507,22 +530,22 @@ export function ReportsView({ course, onBack }: ReportsViewProps) {
                               )}
                             </span>
                           </TableCell>
-                          <TableCell className="text-right tabular-nums">
+                          <TableCell className="px-1 text-right tabular-nums sm:px-2">
                             {row.present}
                           </TableCell>
-                          <TableCell className="text-right tabular-nums">
+                          <TableCell className="px-1 text-right tabular-nums sm:px-2">
                             {row.absent}
                           </TableCell>
-                          <TableCell className="text-right tabular-nums">
+                          <TableCell className="px-1 text-right tabular-nums sm:px-2">
                             {row.late}
                           </TableCell>
-                          <TableCell className="text-right tabular-nums">
+                          <TableCell className="px-1 text-right tabular-nums sm:px-2">
                             {row.leave}
                           </TableCell>
-                          <TableCell className="text-right tabular-nums">
+                          <TableCell className="hidden text-right tabular-nums sm:table-cell">
                             {row.total}
                           </TableCell>
-                          <TableCell className="pr-4 text-right">
+                          <TableCell className="px-1 pr-1 text-right sm:px-2 sm:pr-4">
                             {row.total === 0 ? (
                               <span className="text-xs text-muted-foreground">
                                 —

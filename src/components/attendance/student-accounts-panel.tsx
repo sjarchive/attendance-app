@@ -292,7 +292,7 @@ export function StudentAccountsPanel() {
       ) : (
         <Card className="py-0">
           <CardContent className="p-0">
-            <div className="max-h-96 overflow-y-auto">
+            <div className="overflow-auto sm:max-h-96">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">

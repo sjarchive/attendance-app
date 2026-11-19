@@ -95,63 +95,51 @@ export function Dashboard({
         </Button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
+        <Card className="p-3 sm:p-4">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
               <Layers className="h-4 w-4" aria-hidden="true" />
             </div>
-            <div className="min-w-0">
-              {loading ? (
-                <Skeleton className="h-6 w-10" />
-              ) : (
-                <p className="text-lg font-semibold leading-none">
-                  {grouped.length}
-                </p>
-              )}
-              <p className="mt-1 truncate text-xs text-muted-foreground">
-                Programs
+            {loading ? (
+              <Skeleton className="h-6 w-10" />
+            ) : (
+              <p className="text-lg font-semibold leading-none sm:text-xl">
+                {grouped.length}
               </p>
-            </div>
+            )}
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">Programs</p>
         </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
+        <Card className="p-3 sm:p-4">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
               <BookOpen className="h-4 w-4" aria-hidden="true" />
             </div>
-            <div className="min-w-0">
-              {loading ? (
-                <Skeleton className="h-6 w-10" />
-              ) : (
-                <p className="text-lg font-semibold leading-none">
-                  {courses.length}
-                </p>
-              )}
-              <p className="mt-1 truncate text-xs text-muted-foreground">
-                Courses
+            {loading ? (
+              <Skeleton className="h-6 w-10" />
+            ) : (
+              <p className="text-lg font-semibold leading-none sm:text-xl">
+                {courses.length}
               </p>
-            </div>
+            )}
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">Courses</p>
         </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
+        <Card className="p-3 sm:p-4">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
               <Users className="h-4 w-4" aria-hidden="true" />
             </div>
-            <div className="min-w-0">
-              {loading ? (
-                <Skeleton className="h-6 w-10" />
-              ) : (
-                <p className="text-lg font-semibold leading-none">
-                  {totalStudents}
-                </p>
-              )}
-              <p className="mt-1 truncate text-xs text-muted-foreground">
-                Students
+            {loading ? (
+              <Skeleton className="h-6 w-10" />
+            ) : (
+              <p className="text-lg font-semibold leading-none sm:text-xl">
+                {totalStudents}
               </p>
-            </div>
+            )}
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">Students</p>
         </Card>
       </div>
 

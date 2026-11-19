@@ -627,28 +627,30 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
       </CardHeader>
       <CardContent className="p-4 md:p-6">
         <Tabs defaultValue="professors" className="gap-4">
-          <TabsList>
-            <TabsTrigger value="professors">
-              <UsersIcon />
-              Professors
-            </TabsTrigger>
-            <TabsTrigger value="programs">
-              <GraduationCapIcon />
-              Programs
-            </TabsTrigger>
-            <TabsTrigger value="courses">
-              <BookOpenIcon />
-              Courses
-            </TabsTrigger>
-            <TabsTrigger value="students">
-              <KeyRoundIcon />
-              Students
-            </TabsTrigger>
-            <TabsTrigger value="audit">
-              <HistoryIcon />
-              Audit log
-            </TabsTrigger>
-          </TabsList>
+          <div className="-mx-1 w-full overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <TabsList className="w-fit">
+              <TabsTrigger value="professors">
+                <UsersIcon />
+                Professors
+              </TabsTrigger>
+              <TabsTrigger value="programs">
+                <GraduationCapIcon />
+                Programs
+              </TabsTrigger>
+              <TabsTrigger value="courses">
+                <BookOpenIcon />
+                Courses
+              </TabsTrigger>
+              <TabsTrigger value="students">
+                <KeyRoundIcon />
+                Students
+              </TabsTrigger>
+              <TabsTrigger value="audit">
+                <HistoryIcon />
+                Audit log
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* ── Professors ─────────────────────────────────────────── */}
           <TabsContent value="professors" className="flex flex-col gap-4">
@@ -679,7 +681,7 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
                 description="Create the first account so someone can manage courses and attendance."
               />
             ) : (
-              <div className="max-h-96 overflow-y-auto rounded-md border">
+              <div className="overflow-auto rounded-md border sm:max-h-96">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
@@ -810,7 +812,7 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
                 description="Programs group courses and their students. Add the first one to get started."
               />
             ) : (
-              <div className="max-h-96 overflow-y-auto rounded-md border">
+              <div className="overflow-auto rounded-md border sm:max-h-96">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
@@ -890,7 +892,7 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
                 description="Create a course and assign it to a program and a professor."
               />
             ) : (
-              <div className="max-h-96 overflow-y-auto rounded-md border">
+              <div className="overflow-auto rounded-md border sm:max-h-96">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
