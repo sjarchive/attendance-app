@@ -5,7 +5,7 @@ attendance per course, manage rosters, and review reports with CSV export. An AD
 (HoD) manages professor accounts, programs and courses. Students get a read-only view
 of their own attendance history.
 
-**Live demo**: https://attendance-app-seven-phi.vercel.app
+**Live demo**: https://deptattend.vercel.app
 
 ## Features
 
