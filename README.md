@@ -1,97 +1,131 @@
 # Department Attendance Tracker
 
-A student attendance tracking app for a college department, built per `upload/attendance-app-plan.md`.
+A student attendance tracking app for a college department. Professors mark daily
+attendance per course, manage rosters, and review reports with CSV export. An ADMIN
+(HoD) manages professor accounts, programs and courses. Students get a read-only view
+of their own attendance history.
 
-Professors mark daily attendance per course, manage rosters, view reports and CSV exports. An ADMIN (HOD) manages professor accounts, programs and courses. Students have read-only access to their own attendance history.
+**Live demo**: https://attendance-app-seven-phi.vercel.app
+
+## Features
+
+- Role-based access: ADMIN, PROFESSOR, STUDENT (read-only self-view)
+- Daily marking with four statuses: Present / Absent / Late / Leave
+- Keyboard shortcuts (P/A/L/V, arrow keys) and "mark all present" for fast roll-call
+- Past dates can be re-opened and corrected; future dates are blocked
+- Duplicate-proof saves (upsert per course + student + date)
+- Per-course roster management with soft-removal (attendance history preserved)
+- CSV roster import and CSV attendance export
+- Reports: attendance percentages per student and per session
+- Admin panel: professors (with password reset / enable / disable), programs, courses
+- Audit trail of every mutation (who changed what, when)
 
 ## Tech Stack
 
-- **Next.js 16** (App Router) + **TypeScript 5**
-- **Tailwind CSS 4** + **shadcn/ui** (New York) + Lucide icons
-- **Prisma ORM** — PostgreSQL on Neon (pooled connection at runtime, direct endpoint for migrations)
-- Auth: signed HMAC-SHA256 session cookie (Web Crypto, Edge-compatible), bcryptjs password hashing, login rate limiting
-- Validation: zod on every API route; audit log for all mutations
+- Next.js 16 (App Router) + TypeScript 5
+- Tailwind CSS 4 + shadcn/ui (New York) + Lucide icons
+- Prisma ORM + PostgreSQL (Neon): pooled connection at runtime, direct endpoint for migrations
+- Auth: HMAC-SHA256 signed session cookie (Web Crypto, Edge-compatible), bcryptjs
+  password hashing, login rate limiting
+- zod validation on every API route; single-page UI on the `/` route
 
-## Live Site (this environment)
+## Getting Started
 
-- **Production (Vercel + Neon)**: https://attendance-app-seven-phi.vercel.app
-- Local dev server: **port 3000** — use the **Preview Panel** (or "Open in New Tab").
-- The sandbox only exposes the `/` route, so no other pages exist.
-- Local dev and production share the same Neon database in this setup.
+Prerequisites: [Bun](https://bun.sh) (or Node 20+ with npm) and a PostgreSQL database
+([Neon](https://neon.tech) recommended).
 
-### Demo credentials
+1. Install dependencies:
+
+   ```bash
+   bun install
+   ```
+
+2. Create `.env` in the project root:
+
+   ```env
+   DATABASE_URL=postgresql://user:pass@ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require
+   DIRECT_URL=postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require
+   AUTH_SECRET=<random 32-byte hex>
+   ```
+
+   - `DATABASE_URL` — pooled connection string (runtime queries)
+   - `DIRECT_URL` — direct connection string (used by Prisma Migrate)
+   - `AUTH_SECRET` — signs the session cookie (`openssl rand -hex 32`)
+
+3. Apply migrations and (optionally) seed demo data:
+
+   ```bash
+   bunx prisma migrate deploy
+   bunx tsx prisma/seed.ts
+   ```
+
+4. Start the dev server:
+
+   ```bash
+   bun run dev
+   ```
+
+### Demo credentials (after seeding)
 
 | Role | Email | Password |
 | --- | --- | --- |
-| ADMIN (HOD) | `admin@dept.edu` | `admin123` |
+| ADMIN (HoD) | `admin@dept.edu` | `admin123` |
 | Professor | `meera@dept.edu` | `prof123` |
 | Professor | `rajesh@dept.edu` | `prof123` |
 | Student (read-only) | `bed1-01@student.dept.edu` | `BED1-01` |
 
-## Local Development
+Student accounts are optional and created by an admin (email = `rollno@student.dept.edu`,
+initial password = roll number). Rotate or remove all demo accounts before real use.
 
-The schema is PostgreSQL, so local dev also runs against the Neon database:
+### Scripts
 
-```bash
-bun install
-bunx prisma migrate deploy   # apply migrations (uses DIRECT_URL)
-bunx tsx prisma/seed.ts      # seed ADMIN, professors, programs, courses, students, demo attendance
-bun run dev                  # start dev server on port 3000
-bun run lint                 # ESLint
-bunx tsc --noEmit            # type check
-```
+| Command | Purpose |
+| --- | --- |
+| `bun run dev` | Dev server on port 3000 |
+| `bun run build` | Standalone production build (self-hosting) |
+| `bun run start` | Serve the standalone build |
+| `bun run lint` | ESLint |
+| `bunx tsc --noEmit` | Type check |
+| `bunx prisma migrate dev` | Create a migration after schema changes |
+| `bunx prisma migrate deploy` | Apply migrations |
 
-### Environment variables (`.env`)
+## Deploying to Vercel + Neon
 
-```
-DATABASE_URL=postgresql://...pooler...neon.tech/neondb?sslmode=require   # runtime (pooled)
-DIRECT_URL=postgresql://...neon.tech/neondb?sslmode=require              # migrations (direct)
-AUTH_SECRET=<random-32-byte-hex>   # signs the session cookie; production uses its own
-```
+1. Create a Neon project and copy both connection strings (pooled + direct).
+2. Create a Vercel project and set the environment variables:
+   `DATABASE_URL` (pooled), `DIRECT_URL` (direct), `AUTH_SECRET`.
+3. Deploy — `vercel.json` already overrides the build command to
+   `prisma generate && next build`:
 
-`.env` is gitignored — never commit real secrets.
+   ```bash
+   vercel deploy --prod
+   ```
 
-> Sandbox quirk: this environment exports `DATABASE_URL=file:...` globally, and process env
-> overrides `.env` files. Start the dev server with explicit overrides:
-> `DATABASE_URL=$(grep '^DATABASE_URL' .env | cut -d= -f2-) DIRECT_URL=... bun run dev`
+   Alternatively connect the GitHub repo in the Vercel dashboard for auto-deploys on push.
+4. On a fresh database, run migrations and seed against production once:
 
-## Production Deployment (plan Step 9 — completed)
+   ```bash
+   DATABASE_URL=<pooled> DIRECT_URL=<direct> bunx prisma migrate deploy
+   DATABASE_URL=<pooled> bunx tsx prisma/seed.ts   # optional demo data
+   ```
 
-Deployed: **https://attendance-app-seven-phi.vercel.app** (Vercel) + Neon Postgres (ap-southeast-1).
+5. Sign in as ADMIN and create the real professor accounts in the Admin panel.
 
-What was done:
-
-1. `prisma/schema.prisma` switched to `postgresql` with `directUrl = env("DIRECT_URL")`.
-2. Schema pushed to Neon, baseline migration `prisma/migrations/0_init` created via
-   `prisma migrate diff` and marked applied (`prisma migrate resolve --applied 0_init`).
-3. Database seeded (ADMIN + demo data) against Neon.
-4. Repo pushed to GitHub: `sjarchive/attendance-app` (private). `.env` untracked.
-5. Vercel project `attendance-app` linked via CLI; production env vars set:
-   `DATABASE_URL` (pooled), `DIRECT_URL` (direct), `AUTH_SECRET` (fresh random hex).
-   `vercel.json` overrides build: `prisma generate && next build`.
-6. Deployed with `vercel deploy --prod`.
-7. Smoke test on the live URL passed: login → mark → re-open and edit → logout.
-
-### Redeploy after changes
-
-```bash
-vercel deploy --prod   # needs a Vercel token: --token <TOKEN>
-git push               # keep GitHub in sync
-```
-
-Optional CI: install the Vercel GitHub App (vercel.com dashboard → Project → Settings → Git)
-to auto-deploy on every push (CLI `vercel git connect` requires the app installed interactively).
-
-### Creating real accounts
-
-Sign in as ADMIN (`admin@dept.edu`) on the live URL, use the Admin panel to create the real
-professor accounts and distribute credentials. Rotate the demo passwords first.
-
-### Alternative: self-hosted production build
+### Self-hosting alternative
 
 ```bash
 bun run build   # standalone Next.js build
-bun run start   # serves .next/standalone/server.js (logs to server.log)
+bun run start   # serves .next/standalone/server.js
+```
+
+## Project Structure
+
+```
+prisma/            schema.prisma, migrations/, seed.ts
+src/app/           page.tsx (single-page UI) + api/ route handlers
+src/components/    attendance/ — login, dashboard, marker, roster, reports, admin, audit
+src/lib/           session, db, auth, audit, rate-limit, course-access, csv, date helpers
+src/middleware.ts  session gate for all API routes (except /api/auth/*)
 ```
 
 ## Security Notes
@@ -100,6 +134,6 @@ bun run start   # serves .next/standalone/server.js (logs to server.log)
 - Professors can only access their own courses (ownership checks return 403/404).
 - Login is rate-limited (10 attempts / 5 min per IP+email); generic "invalid credentials" errors.
 - Attendance records are unique per `(courseId, studentId, date)` — upsert-based, no duplicates.
-- Deleted students are soft-deleted (`active=false`) to preserve attendance history.
+- Removed students keep their attendance history; only their enrollments are deactivated.
 - All create/update/delete mutations are recorded in the audit log.
-- Future dates cannot be marked.
+- Future dates cannot be marked. `.env` is gitignored — never commit secrets.
