@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     "Daily student attendance tracking for college departments — professors mark attendance per course, admins manage accounts, programs and courses.",
   keywords: ["attendance", "college", "department", "professor", "student"],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/logo.svg",
   },
 };
 
