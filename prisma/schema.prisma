@@ -1,0 +1,140 @@
+// Student Attendance Tracking — data model (plan Section 2)
+// Production: PostgreSQL on Neon. DATABASE_URL uses the pooled connection
+// string (serverless-friendly); DIRECT_URL (direct endpoint) is used by
+// prisma migrate/db push. Role/status are validated String fields.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Professor {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  // "PROFESSOR" | "ADMIN" (enum not supported on SQLite)
+  role         String   @default("PROFESSOR")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  courses Course[]
+
+  // attendance rows this professor has marked
+  markedRecords AttendanceRecord[] @relation("MarkedBy")
+
+  @@map("professors")
+}
+
+model Program {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  courses  Course[]
+  students Student[]
+
+  @@map("programs")
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  code        String
+  title       String
+  programId   String
+  professorId String
+  createdAt   DateTime @default(now())
+
+  program   Program     @relation(fields: [programId], references: [id], onDelete: Cascade)
+  professor Professor   @relation(fields: [professorId], references: [id], onDelete: Cascade)
+  enrollments Enrollment[]
+  attendance  AttendanceRecord[]
+
+  @@unique([programId, code])
+  @@map("courses")
+}
+
+model Student {
+  id           String   @id @default(cuid())
+  rollNo       String
+  name         String
+  programId    String
+  // Optional read-only login for the student self-view (Phase 2).
+  // Credentials are created by admins; students cannot modify them.
+  email        String?  @unique
+  passwordHash String?
+  createdAt    DateTime @default(now())
+
+  program     Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  enrollments Enrollment[]
+  attendance  AttendanceRecord[]
+
+  // roll_no unique per program (plan Section 2)
+  @@unique([programId, rollNo])
+  @@map("students")
+}
+
+// Explicit per-course roster with soft-remove support:
+// plan Step 6 — removing a student keeps past attendance rows but
+// unenrolls from future marking (active flag on the enrollment).
+model Enrollment {
+  id        String   @id @default(cuid())
+  courseId  String
+  studentId String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  // attendance rows are kept for removed students (no cascade on student side)
+
+  @@unique([courseId, studentId])
+  @@map("enrollments")
+}
+
+model AttendanceRecord {
+  id         String   @id @default(cuid())
+  courseId   String
+  studentId  String
+  date       String // "YYYY-MM-DD" (date-only, timezone-safe)
+  // "PRESENT" | "ABSENT" | "LATE" | "LEAVE"
+  status     String
+  markedById String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  course   Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student  Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  markedBy Professor @relation("MarkedBy", fields: [markedById], references: [id], onDelete: Cascade)
+
+  // blocks double-marking; makes saves idempotent and re-editable (plan Section 2)
+  @@unique([courseId, studentId, date])
+  @@index([courseId, date])
+  @@map("attendance")
+}
+
+// Audit trail (Phase 2 — "who edited which record and when").
+// No FK relations on purpose: entries survive deletes of the referenced rows.
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String // e.g. SAVE_ATTENDANCE, ADD_STUDENT, DELETE_COURSE
+  entityType  String // attendance | student | course | program | professor | student_account
+  entityId    String
+  entityLabel String // human-readable, e.g. "EDU-101 · 2026-11-19"
+  details     String? // JSON blob (diffs, summaries). Never contains passwords.
+  actorId     String
+  actorName   String
+  courseId    String? // set on attendance-scoped entries so professors can read them
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entityType])
+  @@index([courseId])
+  @@map("audit_log")
+}
