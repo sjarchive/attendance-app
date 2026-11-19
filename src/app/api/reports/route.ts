@@ -39,17 +39,18 @@ export async function GET(request: NextRequest) {
     if (from) dateFilter.gte = from;
     if (to) dateFilter.lte = to;
 
-    const records = await db.attendanceRecord.findMany({
-      where: { courseId, ...(from || to ? { date: dateFilter } : {}) },
-      select: { studentId: true, date: true, status: true },
-    });
-
-    // Students = active enrollments + anyone with records in range
-    const enrollments = await db.enrollment.findMany({
-      where: { courseId },
-      include: { student: true },
-      orderBy: { student: { rollNo: "asc" } },
-    });
+    // Independent reads -> parallel (one round-trip latency instead of two)
+    const [records, enrollments] = await Promise.all([
+      db.attendanceRecord.findMany({
+        where: { courseId, ...(from || to ? { date: dateFilter } : {}) },
+        select: { studentId: true, date: true, status: true },
+      }),
+      db.enrollment.findMany({
+        where: { courseId },
+        include: { student: true },
+        orderBy: { student: { rollNo: "asc" } },
+      }),
+    ]);
 
     const stats = new Map<
       string,

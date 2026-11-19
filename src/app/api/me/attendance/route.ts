@@ -11,23 +11,25 @@ export async function GET() {
   const { user } = auth;
 
   try {
-    const student = await db.student.findUnique({
-      where: { id: user.id },
-      include: { program: true },
-    });
+    // All three reads key off the JWT subject, so they can run in parallel;
+    // the student existence check happens on the resolved rows.
+    const [student, enrollments, records] = await Promise.all([
+      db.student.findUnique({
+        where: { id: user.id },
+        include: { program: true },
+      }),
+      db.enrollment.findMany({
+        where: { studentId: user.id },
+        include: { course: true },
+        orderBy: { course: { code: "asc" } },
+      }),
+      db.attendanceRecord.findMany({
+        where: { studentId: user.id },
+        select: { courseId: true, date: true, status: true },
+        orderBy: { date: "desc" },
+      }),
+    ]);
     if (!student) return json({ error: "Student not found" }, 404);
-
-    const enrollments = await db.enrollment.findMany({
-      where: { studentId: student.id },
-      include: { course: true },
-      orderBy: { course: { code: "asc" } },
-    });
-
-    const records = await db.attendanceRecord.findMany({
-      where: { studentId: student.id },
-      select: { courseId: true, date: true, status: true },
-      orderBy: { date: "desc" },
-    });
 
     const byCourse = new Map<
       string,

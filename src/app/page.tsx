@@ -47,15 +47,18 @@ export default function Home() {
     }
   }, []);
 
-  // Session bootstrap
+  // Session bootstrap: one request returns user + courses (see /api/boot).
+  // A 401/session-expiry later in the app falls back to refreshCourses' handler.
   useEffect(() => {
     (async () => {
       try {
-        const data = await apiFetch<{ user: SessionUser }>("/api/auth/me");
+        const data = await apiFetch<{
+          user: SessionUser | null;
+          courses: CourseWithDetails[];
+        }>("/api/boot");
         setUser(data.user);
-        // Students have a dedicated read-only home; skip staff data loading
-        if (data.user.role !== "STUDENT") {
-          await refreshCourses();
+        if (data.user && data.user.role !== "STUDENT") {
+          setCourses(data.courses);
         }
       } catch {
         setUser(null);
@@ -63,7 +66,7 @@ export default function Home() {
         setBooting(false);
       }
     })();
-  }, [refreshCourses]);
+  }, []);
 
   const handleLogin = useCallback(
     (u: SessionUser) => {

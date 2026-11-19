@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireUser, isErrorResponse } from "@/lib/auth";
 import { requireCourseAccess, isCourseAccessError } from "@/lib/course-access";
@@ -116,48 +117,52 @@ export async function POST(request: NextRequest) {
   const { course } = access;
 
   try {
-    // Only students actively enrolled in this course can be marked
-    const activeEnrollments = await db.enrollment.findMany({
-      where: { courseId, active: true },
-      select: { studentId: true },
-    });
+    // Only students actively enrolled in this course can be marked; the
+    // existing-record snapshot feeds the audit diff. Independent reads ->
+    // run them in parallel.
+    const [activeEnrollments, existingRows] = await Promise.all([
+      db.enrollment.findMany({
+        where: { courseId, active: true },
+        select: { studentId: true },
+      }),
+      db.attendanceRecord.findMany({
+        where: { courseId, date },
+        select: { studentId: true, status: true },
+      }),
+    ]);
     const activeIds = new Set(activeEnrollments.map((e) => e.studentId));
     const validRecords = records.filter((r) => activeIds.has(r.studentId));
 
     if (validRecords.length === 0) {
       return badRequest("No active students in the submitted list");
     }
-
-    // Snapshot existing records so the audit entry can describe the diff
-    const existingRows = await db.attendanceRecord.findMany({
-      where: { courseId, date },
-      select: { studentId: true, status: true },
-    });
     const existingMap = new Map(existingRows.map((r) => [r.studentId, r.status]));
 
-    await db.$transaction(
-      validRecords.map((r) =>
-        db.attendanceRecord.upsert({
-          where: {
-            courseId_studentId_date: { courseId, studentId: r.studentId, date },
-          },
-          create: {
-            courseId,
-            studentId: r.studentId,
-            date,
-            status: r.status,
-            markedById: user.id,
-          },
-          update: { status: r.status, markedById: user.id },
-        })
-      )
+    // Bulk upsert in ONE statement: instead of one round trip per student
+    // (40 students = 40 queries), a single INSERT ... ON CONFLICT covers the
+    // whole roster. This is the dominant cost when the database is remote.
+    const valueRows = validRecords.map((r) =>
+      Prisma.sql`(${r.studentId}::text, ${r.status}::text)`
     );
-
-    // Audit trail: who saved, what changed (Phase 2)
-    const touched = await db.student.findMany({
+    const touchedPromise = db.student.findMany({
       where: { id: { in: validRecords.map((r) => r.studentId) } },
       select: { id: true, rollNo: true, name: true },
     });
+    const [touched] = await Promise.all([
+      touchedPromise,
+      db.$executeRaw`
+        INSERT INTO "attendance"
+          ("id", "courseId", "studentId", "date", "status", "markedById", "createdAt", "updatedAt")
+        SELECT gen_random_uuid()::text, ${courseId}::text, v.student_id, ${date}::text, v.status, ${user.id}::text, now(), now()
+        FROM (VALUES ${Prisma.join(valueRows)}) AS v(student_id, status)
+        ON CONFLICT ("courseId", "studentId", "date")
+        DO UPDATE SET "status" = EXCLUDED."status",
+                      "markedById" = EXCLUDED."markedById",
+                      "updatedAt" = now()
+      `,
+    ]);
+
+    // Audit trail: who saved, what changed (Phase 2)
     const studentById = new Map(touched.map((s) => [s.id, s]));
     let createdCount = 0;
     const changed: { rollNo: string; name: string; from: string; to: string }[] = [];
