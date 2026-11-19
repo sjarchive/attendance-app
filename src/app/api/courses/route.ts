@@ -13,15 +13,29 @@ export async function GET() {
   const { user } = auth;
 
   try {
-    const courses = await db.course.findMany({
-      where: user.role === "ADMIN" ? {} : { professorId: user.id },
-      include: {
-        program: true,
-        professor: true,
-        _count: { select: { enrollments: { where: { active: true } } } },
-      },
-      orderBy: [{ program: { name: "asc" } }, { code: "asc" }],
-    });
+    // Course list and the unique headcount are independent -> run in parallel.
+    const [courses, uniqueStudents] = await Promise.all([
+      db.course.findMany({
+        where: user.role === "ADMIN" ? {} : { professorId: user.id },
+        include: {
+          program: true,
+          professor: true,
+          _count: { select: { enrollments: { where: { active: true } } } },
+        },
+        orderBy: [{ program: { name: "asc" } }, { code: "asc" }],
+      }),
+      // UNIQUE student headcount — NOT the sum of per-course enrollment counts
+      // (students enrolled in 2+ courses would be double-counted).
+      user.role === "ADMIN"
+        ? db.student.count()
+        : db.student.count({
+            where: {
+              enrollments: {
+                some: { active: true, course: { professorId: user.id } },
+              },
+            },
+          }),
+    ]);
 
     const payload: CourseWithDetails[] = courses.map((c) => ({
       id: c.id,
@@ -33,7 +47,7 @@ export async function GET() {
       professorName: c.professor.name,
       studentCount: c._count.enrollments,
     }));
-    return json({ courses: payload });
+    return json({ courses: payload, stats: { students: uniqueStudents } });
   } catch (e) {
     console.error(e);
     return serverError();

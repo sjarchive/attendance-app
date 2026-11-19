@@ -15,7 +15,7 @@ import { AdminPanel } from "@/components/attendance/admin-panel";
 import { ReportsView } from "@/components/attendance/reports-view";
 import { MyAttendance } from "@/components/attendance/my-attendance";
 import { apiFetch } from "@/lib/client";
-import type { CourseWithDetails, SessionUser } from "@/lib/types";
+import type { BootStats, CourseWithDetails, SessionUser } from "@/lib/types";
 
 type View =
   | { name: "dashboard" }
@@ -30,12 +30,17 @@ export default function Home() {
   const [view, setView] = useState<View>({ name: "dashboard" });
   const [courses, setCourses] = useState<CourseWithDetails[]>([]);
   const [coursesLoading, setCoursesLoading] = useState(false);
+  const [uniqueStudents, setUniqueStudents] = useState(0);
 
   const refreshCourses = useCallback(async () => {
     setCoursesLoading(true);
     try {
-      const data = await apiFetch<{ courses: CourseWithDetails[] }>("/api/courses");
+      const data = await apiFetch<{
+        courses: CourseWithDetails[];
+        stats?: BootStats;
+      }>("/api/courses");
       setCourses(data.courses);
+      setUniqueStudents(data.stats?.students ?? 0);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load courses";
       if (message.toLowerCase().includes("session")) {
@@ -55,10 +60,12 @@ export default function Home() {
         const data = await apiFetch<{
           user: SessionUser | null;
           courses: CourseWithDetails[];
+          stats?: BootStats;
         }>("/api/boot");
         setUser(data.user);
         if (data.user && data.user.role !== "STUDENT") {
           setCourses(data.courses);
+          setUniqueStudents(data.stats?.students ?? 0);
         }
       } catch {
         setUser(null);
@@ -88,6 +95,7 @@ export default function Home() {
     setUser(null);
     setView({ name: "dashboard" });
     setCourses([]);
+    setUniqueStudents(0);
     toast("You have been signed out");
   }, []);
 
@@ -185,6 +193,7 @@ export default function Home() {
           <Dashboard
             user={user}
             courses={courses}
+            uniqueStudents={uniqueStudents}
             loading={coursesLoading}
             onMarkAttendance={(course) => setView({ name: "attendance", course })}
             onManageRoster={(course) => setView({ name: "roster", course })}

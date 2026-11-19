@@ -56,6 +56,13 @@ export interface ProgramWithCounts {
   studentCount: number;
 }
 
+// Aggregate stats for staff dashboards. `students` is a UNIQUE student count
+// (not the sum of per-course enrollments, which double-counts students
+// enrolled in more than one course).
+export interface BootStats {
+  students: number;
+}
+
 export interface CourseWithDetails {
   id: string;
   code: string;

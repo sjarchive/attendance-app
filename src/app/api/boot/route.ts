@@ -28,9 +28,10 @@ export async function GET() {
       return json({ user, courses: [] });
     }
 
-    // Staff: active-check and course fetch are independent (the course filter
-    // only needs the id from the signed token), so run them in parallel.
-    const [professor, courses] = await Promise.all([
+    // Staff: active-check, course fetch and the unique headcount are all
+    // independent (the course filter only needs the id from the signed token),
+    // so run them in parallel.
+    const [professor, courses, uniqueStudents] = await Promise.all([
       db.professor.findUnique({
         where: { id: payload.sub },
         select: { id: true, name: true, email: true, role: true, active: true },
@@ -44,6 +45,17 @@ export async function GET() {
         },
         orderBy: [{ program: { name: "asc" } }, { code: "asc" }],
       }),
+      // UNIQUE student headcount — NOT the sum of per-course enrollment counts,
+      // which would double-count every student enrolled in 2+ courses.
+      payload.role === "ADMIN"
+        ? db.student.count()
+        : db.student.count({
+            where: {
+              enrollments: {
+                some: { active: true, course: { professorId: payload.sub } },
+              },
+            },
+          }),
     ]);
 
     if (!professor || !professor.active) return json({ user: null, courses: [] });
@@ -66,7 +78,7 @@ export async function GET() {
       studentCount: c._count.enrollments,
     }));
 
-    return json({ user, courses: courseList });
+    return json({ user, courses: courseList, stats: { students: uniqueStudents } });
   } catch (e) {
     console.error(e);
     return serverError();

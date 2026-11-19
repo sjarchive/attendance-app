@@ -29,6 +29,8 @@ import type { CourseWithDetails, SessionUser } from "@/lib/types";
 interface DashboardProps {
   user: SessionUser;
   courses: CourseWithDetails[];
+  /** UNIQUE student headcount from the API (per-course sums double-count). */
+  uniqueStudents: number;
   loading: boolean;
   onMarkAttendance: (course: CourseWithDetails) => void;
   onManageRoster: (course: CourseWithDetails) => void;
@@ -46,6 +48,7 @@ function greeting(): string {
 export function Dashboard({
   user,
   courses,
+  uniqueStudents,
   loading,
   onMarkAttendance,
   onManageRoster,
@@ -61,11 +64,6 @@ export function Dashboard({
     }
     return Array.from(map.entries());
   }, [courses]);
-
-  const totalStudents = useMemo(
-    () => courses.reduce((sum, c) => sum + c.studentCount, 0),
-    [courses]
-  );
 
   return (
     <div className="space-y-6">
@@ -135,7 +133,7 @@ export function Dashboard({
               <Skeleton className="h-6 w-10" />
             ) : (
               <p className="text-lg font-semibold leading-none sm:text-xl">
-                {totalStudents}
+                {uniqueStudents}
               </p>
             )}
           </div>
