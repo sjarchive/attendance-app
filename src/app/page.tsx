@@ -237,9 +237,6 @@ export default function Home() {
           <p className="text-xs text-muted-foreground">
             Department of Education · Attendance System
           </p>
-          <p className="text-xs text-muted-foreground">
-            {new Date().getFullYear()} · Annual system (no semesters)
-          </p>
         </div>
       </footer>
     </div>

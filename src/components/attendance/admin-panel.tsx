@@ -958,10 +958,6 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
 
           {/* ── Students (self-view credentials, Phase 2) ───────────── */}
           <TabsContent value="students" className="flex flex-col gap-4">
-            <p className="text-sm text-muted-foreground">
-              Give students read-only access to their own attendance. They sign
-              in with the username and password you set here.
-            </p>
             <StudentAccountsPanel />
           </TabsContent>
 
