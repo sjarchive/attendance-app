@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { GraduationCap, Loader2, Lock, Mail } from "lucide-react";
+import { GraduationCap, Loader2, Lock, User } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,18 +22,18 @@ interface LoginScreenProps {
 }
 
 const DEMO_ACCOUNTS = [
-  { label: "Administrator (HoD)", email: "admin@dept.edu", password: "admin123" },
-  { label: "Professor", email: "meera@dept.edu", password: "prof123" },
-  { label: "Professor", email: "rajesh@dept.edu", password: "prof123" },
+  { label: "Administrator (HoD)", username: "admin", password: "admin123" },
+  { label: "Professor", username: "meera", password: "prof123" },
+  { label: "Professor", username: "rajesh", password: "prof123" },
   {
     label: "Student (read-only)",
-    email: "bed1-01@student.dept.edu",
+    username: "bed1-01",
     password: "BED1-01",
   },
 ];
 
 export function LoginScreen({ onLogin }: LoginScreenProps) {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -46,7 +46,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
     try {
       const data = await apiFetch<{ user: SessionUser }>("/api/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username, password }),
       });
       toast.success(`Welcome, ${data.user.name}`);
       onLogin(data.user);
@@ -84,21 +84,21 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="username">Username</Label>
                 <div className="relative">
-                  <Mail
+                  <User
                     className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
                     aria-hidden="true"
                   />
                   <Input
-                    id="email"
-                    type="email"
-                    autoComplete="email"
+                    id="username"
+                    type="text"
+                    autoComplete="username"
                     required
-                    placeholder="name@dept.edu"
+                    placeholder="e.g. admin"
                     className="pl-9"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
                     disabled={submitting}
                   />
                 </div>
@@ -151,17 +151,17 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
             </p>
             <ul className="mt-2 space-y-1">
               {DEMO_ACCOUNTS.map((acc) => (
-                <li key={acc.email}>
+                <li key={acc.username}>
                   <button
                     type="button"
                     className="w-full rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     onClick={() => {
-                      setEmail(acc.email);
+                      setUsername(acc.username);
                       setPassword(acc.password);
                     }}
                   >
                     <span className="font-medium text-foreground">
-                      {acc.email}
+                      {acc.username}
                     </span>
                     <span className="mx-1.5 text-border">|</span>
                     {acc.password}

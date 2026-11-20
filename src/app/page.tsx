@@ -160,7 +160,7 @@ export default function Home() {
             <div className="hidden text-right md:block">
               <p className="text-xs font-medium leading-tight">{user.name}</p>
               <p className="text-[11px] leading-tight text-muted-foreground">
-                {user.email}
+                {user.username}
               </p>
             </div>
             <Badge

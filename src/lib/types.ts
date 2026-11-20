@@ -45,7 +45,7 @@ export const STATUS_META: Record<
 export interface SessionUser {
   id: string;
   name: string;
-  email: string;
+  username: string;
   role: Role;
 }
 
@@ -77,7 +77,7 @@ export interface CourseWithDetails {
 export interface ProfessorAccount {
   id: string;
   name: string;
-  email: string;
+  username: string;
   role: Role;
   active: boolean;
   courseCount: number;
@@ -174,7 +174,7 @@ export interface StudentAccountView {
   id: string;
   rollNo: string;
   name: string;
-  email: string | null;
+  username: string | null;
   hasPassword: boolean;
   activeEnrollments: number;
 }

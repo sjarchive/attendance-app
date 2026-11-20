@@ -16,7 +16,7 @@ datasource db {
 model Professor {
   id           String   @id @default(cuid())
   name         String
-  email        String   @unique
+  username     String   @unique
   passwordHash String
   // "PROFESSOR" | "ADMIN" (enum not supported on SQLite)
   role         String   @default("PROFESSOR")
@@ -67,7 +67,7 @@ model Student {
   programId    String
   // Optional read-only login for the student self-view (Phase 2).
   // Credentials are created by admins; students cannot modify them.
-  email        String?  @unique
+  username     String?  @unique
   passwordHash String?
   createdAt    DateTime @default(now())
 

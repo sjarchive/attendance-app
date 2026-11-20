@@ -6,7 +6,7 @@ export interface SessionPayload {
   sub: string;
   role: string;
   name: string;
-  email: string;
+  username: string;
   iat: number;
   exp: number;
 }
@@ -66,14 +66,14 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 export async function createSessionToken(
-  user: { id: string; role: string; name: string; email: string }
+  user: { id: string; role: string; name: string; username: string }
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const payload: SessionPayload = {
     sub: user.id,
     role: user.role,
     name: user.name,
-    email: user.email,
+    username: user.username,
     iat: now,
     exp: now + SESSION_DAYS * 24 * 60 * 60,
   };

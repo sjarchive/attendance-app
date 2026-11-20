@@ -63,8 +63,8 @@ function generatePassword(): string {
   return out;
 }
 
-function suggestEmail(rollNo: string): string {
-  return `${rollNo.toLowerCase()}@student.dept.edu`;
+function suggestUsername(rollNo: string): string {
+  return rollNo.toLowerCase();
 }
 
 export function StudentAccountsPanel() {
@@ -78,7 +78,7 @@ export function StudentAccountsPanel() {
   const [studentsError, setStudentsError] = useState<string | null>(null);
 
   const [editing, setEditing] = useState<StudentAccountView | null>(null);
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -138,7 +138,7 @@ export function StudentAccountsPanel() {
 
   function openCredentials(student: StudentAccountView) {
     setEditing(student);
-    setEmail(student.email ?? suggestEmail(student.rollNo));
+    setUsername(student.username ?? suggestUsername(student.rollNo));
     setPassword("");
   }
 
@@ -150,7 +150,7 @@ export function StudentAccountsPanel() {
         method: "PATCH",
         body: JSON.stringify({
           studentId: editing.id,
-          email: email.trim(),
+          username: username.trim(),
           password,
         }),
       });
@@ -176,7 +176,7 @@ export function StudentAccountsPanel() {
       );
       const skippedNote =
         res.skipped.length > 0
-          ? `, skipped ${res.skipped.length} (email taken)`
+          ? `, skipped ${res.skipped.length} (username taken)`
           : "";
       toast.success(`Enabled ${res.enabled} student logins${skippedNote}`);
       setBulkOpen(false);
@@ -299,7 +299,7 @@ export function StudentAccountsPanel() {
                     <TableHead className="pl-4">Roll No</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Courses</TableHead>
-                    <TableHead>Login email</TableHead>
+                    <TableHead>Login username</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="pr-4 text-right">Action</TableHead>
                   </TableRow>
@@ -317,7 +317,7 @@ export function StudentAccountsPanel() {
                         {student.activeEnrollments}
                       </TableCell>
                       <TableCell>
-                        {student.email ?? (
+                        {student.username ?? (
                           <span className="text-muted-foreground">
                             not set
                           </span>
@@ -380,13 +380,13 @@ export function StudentAccountsPanel() {
 
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="student-login-email">Email</Label>
+              <Label htmlFor="student-login-username">Username</Label>
               <Input
-                id="student-login-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={editing ? suggestEmail(editing.rollNo) : ""}
+                id="student-login-username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder={editing ? suggestUsername(editing.rollNo) : ""}
                 autoComplete="off"
               />
             </div>
@@ -415,7 +415,7 @@ export function StudentAccountsPanel() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Students sign in with this email to view their own attendance
+              Students sign in with this username to view their own attendance
               (read-only).
             </p>
           </div>
@@ -431,7 +431,7 @@ export function StudentAccountsPanel() {
             <Button
               className="bg-emerald-600 text-white hover:bg-emerald-700"
               onClick={() => void handleSave()}
-              disabled={saving || !email.trim() || password.length === 0}
+              disabled={saving || !username.trim() || password.length === 0}
             >
               {saving ? (
                 <Loader2
@@ -457,8 +457,8 @@ export function StudentAccountsPanel() {
               Enable logins for students without credentials?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Students without credentials will get email =
-              rollno@student.dept.edu and password = their roll number. Share
+              Students without credentials will get username = their roll
+              number (lowercase) and password = their roll number. Share
               the credentials in person — students can then sign in to view
               their own attendance (read-only).
             </AlertDialogDescription>

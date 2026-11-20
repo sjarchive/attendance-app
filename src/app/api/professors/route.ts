@@ -20,7 +20,7 @@ export async function GET() {
     const payload: ProfessorAccount[] = professors.map((p) => ({
       id: p.id,
       name: p.name,
-      email: p.email,
+      username: p.username,
       role: p.role === "ADMIN" ? "ADMIN" : "PROFESSOR",
       active: p.active,
       courseCount: p._count.courses,
@@ -35,7 +35,13 @@ export async function GET() {
 
 const createSchema = z.object({
   name: z.string().trim().min(2, "Name is required").max(80),
-  email: z.string().trim().toLowerCase().email("Enter a valid email address"),
+  username: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(3, "Username must be at least 3 characters")
+    .max(40, "Username must be at most 40 characters")
+    .regex(/^[a-z0-9][a-z0-9._-]*$/, "Only letters, numbers, dots, hyphens, and underscores are allowed"),
   password: z.string().min(8, "Password must be at least 8 characters").max(72),
   role: z.enum(["PROFESSOR", "ADMIN"]),
 });
@@ -56,25 +62,25 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return badRequest(parsed.error.issues[0]?.message ?? "Invalid input");
   }
-  const { name, email, password, role } = parsed.data;
+  const { name, username, password, role } = parsed.data;
 
   try {
-    const exists = await db.professor.findUnique({ where: { email } });
-    if (exists) return conflict("An account with this email already exists");
+    const exists = await db.professor.findUnique({ where: { username } });
+    if (exists) return conflict("An account with this username already exists");
 
     const professor = await db.professor.create({
-      data: { name, email, passwordHash: await hashPassword(password), role },
+      data: { name, username, passwordHash: await hashPassword(password), role },
     });
     await logAudit({
       action: "CREATE_PROFESSOR",
       entityType: "professor",
       entityId: professor.id,
-      entityLabel: `${professor.name} <${professor.email}>`,
+      entityLabel: `${professor.name} <${professor.username}>`,
       details: { role },
       actor: auth.user,
     });
     return json(
-      { professor: { id: professor.id, name: professor.name, email: professor.email } },
+      { professor: { id: professor.id, name: professor.name, username: professor.username } },
       201
     );
   } catch (e) {

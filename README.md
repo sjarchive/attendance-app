@@ -67,15 +67,15 @@ Prerequisites: [Bun](https://bun.sh) (or Node 20+ with npm) and a PostgreSQL dat
 
 ### Demo credentials (after seeding)
 
-| Role | Email | Password |
+| Role | Username | Password |
 | --- | --- | --- |
-| ADMIN (HoD) | `admin@dept.edu` | `admin123` |
-| Professor | `meera@dept.edu` | `prof123` |
-| Professor | `rajesh@dept.edu` | `prof123` |
-| Student (read-only) | `bed1-01@student.dept.edu` | `BED1-01` |
+| ADMIN (HoD) | `admin` | `admin123` |
+| Professor | `meera` | `prof123` |
+| Professor | `rajesh` | `prof123` |
+| Student (read-only) | `bed1-01` | `BED1-01` |
 
-Student accounts are optional and created by an admin (email = `rollno@student.dept.edu`,
-initial password = roll number). Rotate or remove all demo accounts before real use.
+Student accounts are optional and created by an admin (username = their roll
+number in lowercase, initial password = roll number). Rotate or remove all demo accounts before real use.
 
 ### Scripts
 
@@ -132,7 +132,7 @@ src/middleware.ts  session gate for all API routes (except /api/auth/*)
 
 - All API routes require a valid session (middleware) except `/api/auth/*`.
 - Professors can only access their own courses (ownership checks return 403/404).
-- Login is rate-limited (10 attempts / 5 min per IP+email); generic "invalid credentials" errors.
+- Login is rate-limited (10 attempts / 5 min per IP+username); generic "invalid credentials" errors.
 - Attendance records are unique per `(courseId, studentId, date)` — upsert-based, no duplicates.
 - Removed students keep their attendance history; only their enrollments are deactivated.
 - All create/update/delete mutations are recorded in the audit log.

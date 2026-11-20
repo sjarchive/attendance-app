@@ -16,13 +16,13 @@ export async function GET() {
       // Credentials revoked -> treat as signed out
       const student = await db.student.findUnique({
         where: { id: payload.sub },
-        select: { id: true, name: true, email: true, passwordHash: true },
+        select: { id: true, name: true, username: true, passwordHash: true },
       });
       if (!student || !student.passwordHash) return json({ user: null, courses: [] });
       const user: SessionUser = {
         id: student.id,
         name: student.name,
-        email: student.email ?? "",
+        username: student.username ?? "",
         role: "STUDENT",
       };
       return json({ user, courses: [] });
@@ -34,7 +34,7 @@ export async function GET() {
     const [professor, courses, uniqueStudents] = await Promise.all([
       db.professor.findUnique({
         where: { id: payload.sub },
-        select: { id: true, name: true, email: true, role: true, active: true },
+        select: { id: true, name: true, username: true, role: true, active: true },
       }),
       db.course.findMany({
         where: payload.role === "ADMIN" ? {} : { professorId: payload.sub },
@@ -63,7 +63,7 @@ export async function GET() {
     const user: SessionUser = {
       id: professor.id,
       name: professor.name,
-      email: professor.email,
+      username: professor.username,
       role: professor.role === "ADMIN" ? "ADMIN" : "PROFESSOR",
     };
 

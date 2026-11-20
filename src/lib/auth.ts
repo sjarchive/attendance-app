@@ -26,27 +26,27 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   if (payload.role === "STUDENT") {
     const student = await db.student.findUnique({
       where: { id: payload.sub },
-      select: { id: true, name: true, rollNo: true, email: true, passwordHash: true },
+      select: { id: true, name: true, rollNo: true, username: true, passwordHash: true },
     });
     // Credentials revoked -> session no longer valid
     if (!student || !student.passwordHash) return null;
     return {
       id: student.id,
       name: student.name,
-      email: student.email ?? "",
+      username: student.username ?? "",
       role: "STUDENT",
     };
   }
 
   const professor = await db.professor.findUnique({
     where: { id: payload.sub },
-    select: { id: true, name: true, email: true, role: true, active: true },
+    select: { id: true, name: true, username: true, role: true, active: true },
   });
   if (!professor || !professor.active) return null;
   return {
     id: professor.id,
     name: professor.name,
-    email: professor.email,
+    username: professor.username,
     role: professor.role === "ADMIN" ? "ADMIN" : "PROFESSOR",
   };
 }

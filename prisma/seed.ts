@@ -38,16 +38,16 @@ async function main() {
   await prisma.professor.create({
     data: {
       name: "Dr. Anjali Verma (HoD)",
-      email: "admin@dept.edu",
+      username: "admin",
       passwordHash: adminHash,
       role: "ADMIN",
     },
   });
   const meera = await prisma.professor.create({
-    data: { name: "Dr. Meera Sharma", email: "meera@dept.edu", passwordHash: profHash },
+    data: { name: "Dr. Meera Sharma", username: "meera", passwordHash: profHash },
   });
   const rajesh = await prisma.professor.create({
-    data: { name: "Dr. Rajesh Iyer", email: "rajesh@dept.edu", passwordHash: profHash },
+    data: { name: "Dr. Rajesh Iyer", username: "rajesh", passwordHash: profHash },
   });
 
   const programs = await Promise.all(
@@ -164,24 +164,24 @@ async function main() {
     ],
   });
 
-  // Student self-view credentials (Phase 2): email = rollno@student.dept.edu,
-  // password = roll number, so admins can announce the pattern.
+  // Student self-view credentials (Phase 2): username = roll number
+  // (lowercase), password = roll number, so admins can announce the pattern.
   const allStudents = await prisma.student.findMany();
   for (const s of allStudents) {
     await prisma.student.update({
       where: { id: s.id },
       data: {
-        email: `${s.rollNo.toLowerCase()}@student.dept.edu`,
+        username: s.rollNo.toLowerCase(),
         passwordHash: await bcrypt.hash(s.rollNo, 10),
       },
     });
   }
 
   console.log(`Seeded 3 accounts, ${programs.length} programs, ${courses.length} courses, ${programs.length * 10} students, demo attendance for ${demoDate}.`);
-  console.log("Admin:    admin@dept.edu / admin123");
-  console.log("Professor: meera@dept.edu / prof123");
-  console.log("Professor: rajesh@dept.edu / prof123");
-  console.log("Student (read-only): bed1-01@student.dept.edu / BED1-01  (email = rollno@student.dept.edu, password = roll number)");
+  console.log("Admin:    admin / admin123");
+  console.log("Professor: meera / prof123");
+  console.log("Professor: rajesh / prof123");
+  console.log("Student (read-only): bed1-01 / BED1-01  (username = roll number lowercase, password = roll number)");
 }
 
 main()

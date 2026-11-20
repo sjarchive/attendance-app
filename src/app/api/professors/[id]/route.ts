@@ -8,7 +8,14 @@ import { logAudit } from "@/lib/audit";
 
 const updateSchema = z.object({
   name: z.string().trim().min(2).max(80).optional(),
-  email: z.string().trim().toLowerCase().email().optional(),
+  username: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(3, "Username must be at least 3 characters")
+    .max(40, "Username must be at most 40 characters")
+    .regex(/^[a-z0-9][a-z0-9._-]*$/, "Only letters, numbers, dots, hyphens, and underscores are allowed")
+    .optional(),
   password: z.string().min(8, "Password must be at least 8 characters").max(72).optional(),
   active: z.boolean().optional(),
 });
@@ -44,26 +51,26 @@ export async function PATCH(
     const professor = await db.professor.findUnique({ where: { id } });
     if (!professor) return notFound("Professor not found");
 
-    if (data.email && data.email !== professor.email) {
-      const duplicate = await db.professor.findUnique({ where: { email: data.email } });
-      if (duplicate) return conflict("An account with this email already exists");
+    if (data.username && data.username !== professor.username) {
+      const duplicate = await db.professor.findUnique({ where: { username: data.username } });
+      if (duplicate) return conflict("An account with this username already exists");
     }
 
     const updated = await db.professor.update({
       where: { id },
       data: {
         ...(data.name ? { name: data.name } : {}),
-        ...(data.email ? { email: data.email } : {}),
+        ...(data.username ? { username: data.username } : {}),
         ...(data.active !== undefined ? { active: data.active } : {}),
         ...(data.password ? { passwordHash: await hashPassword(data.password) } : {}),
       },
-      select: { id: true, name: true, email: true, active: true },
+      select: { id: true, name: true, username: true, active: true },
     });
 
     // Audit trail — never log the password itself
     const changes: Record<string, unknown> = {};
     if (data.name && data.name !== professor.name) changes.name = { from: professor.name, to: data.name };
-    if (data.email && data.email !== professor.email) changes.email = { from: professor.email, to: data.email };
+    if (data.username && data.username !== professor.username) changes.username = { from: professor.username, to: data.username };
     if (data.active !== undefined && data.active !== professor.active) changes.active = { from: professor.active, to: data.active };
     if (data.password) changes.passwordReset = true;
     if (Object.keys(changes).length > 0) {
@@ -71,7 +78,7 @@ export async function PATCH(
         action: "UPDATE_PROFESSOR",
         entityType: "professor",
         entityId: updated.id,
-        entityLabel: `${updated.name} <${updated.email}>`,
+        entityLabel: `${updated.name} <${updated.username}>`,
         details: changes,
         actor: auth.user,
       });

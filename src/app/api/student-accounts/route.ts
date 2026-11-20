@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       id: s.id,
       rollNo: s.rollNo,
       name: s.name,
-      email: s.email,
+      username: s.username,
       hasPassword: Boolean(s.passwordHash),
       activeEnrollments: s._count.enrollments,
     }));
@@ -42,18 +42,20 @@ export async function GET(request: NextRequest) {
 
 const patchSchema = z.object({
   studentId: z.string().min(1),
-  email: z
+  username: z
     .string()
     .trim()
     .toLowerCase()
-    .email("Enter a valid email address")
+    .min(3, "Username must be at least 3 characters")
+    .max(40, "Username must be at most 40 characters")
+    .regex(/^[a-z0-9][a-z0-9._-]*$/, "Only letters, numbers, dots, hyphens, and underscores are allowed")
     .or(z.literal(""))
     .optional(),
   password: z.string().min(6, "Password must be at least 6 characters").max(72).optional(),
 });
 
 // PATCH /api/student-accounts — set or revoke a student's self-view
-// credentials (admin only). Send email: "" to clear the email.
+// credentials (admin only). Send username: "" to clear the username.
 export async function PATCH(request: NextRequest) {
   const auth = await requireAdmin();
   if (isErrorResponse(auth)) return auth.response;
@@ -69,30 +71,30 @@ export async function PATCH(request: NextRequest) {
   if (!parsed.success) {
     return badRequest(parsed.error.issues[0]?.message ?? "Invalid input");
   }
-  const { studentId, email, password } = parsed.data;
+  const { studentId, username, password } = parsed.data;
 
   try {
     const student = await db.student.findUnique({ where: { id: studentId } });
     if (!student) return notFound("Student not found");
 
-    if (email !== undefined && email !== "") {
-      const clashStudent = await db.student.findUnique({ where: { email } });
+    if (username !== undefined && username !== "") {
+      const clashStudent = await db.student.findUnique({ where: { username } });
       if (clashStudent && clashStudent.id !== studentId) {
-        return conflict("This email is already used by another student");
+        return conflict("This username is already used by another student");
       }
-      const clashProfessor = await db.professor.findUnique({ where: { email } });
+      const clashProfessor = await db.professor.findUnique({ where: { username } });
       if (clashProfessor) {
-        return conflict("This email is already used by a faculty account");
+        return conflict("This username is already used by a faculty account");
       }
     }
 
     const updated = await db.student.update({
       where: { id: studentId },
       data: {
-        ...(email !== undefined ? { email: email === "" ? null : email } : {}),
+        ...(username !== undefined ? { username: username === "" ? null : username } : {}),
         ...(password ? { passwordHash: await hashPassword(password) } : {}),
       },
-      select: { id: true, rollNo: true, name: true, email: true, passwordHash: true },
+      select: { id: true, rollNo: true, name: true, username: true, passwordHash: true },
     });
 
     await logAudit({
@@ -101,7 +103,7 @@ export async function PATCH(request: NextRequest) {
       entityId: updated.id,
       entityLabel: `${updated.name} (${updated.rollNo})`,
       details: {
-        emailSet: updated.email,
+        usernameSet: updated.username,
         passwordSet: Boolean(updated.passwordHash),
       },
       actor: auth.user,
@@ -111,7 +113,7 @@ export async function PATCH(request: NextRequest) {
       id: updated.id,
       rollNo: updated.rollNo,
       name: updated.name,
-      email: updated.email,
+      username: updated.username,
       hasPassword: Boolean(updated.passwordHash),
       activeEnrollments: await db.enrollment.count({
         where: { studentId: studentId, active: true },
@@ -127,8 +129,9 @@ export async function PATCH(request: NextRequest) {
 const bulkSchema = z.object({ programId: z.string().min(1) });
 
 // POST /api/student-accounts — bulk-enable self-view logins for a program
-// (admin only). Students without credentials get email = rollno@student.dept.edu
-// and password = their roll number, so the HoD can announce the pattern.
+// (admin only). Students without credentials get username = their roll
+// number (lowercase) and password = their roll number, so the HoD can
+// announce the pattern.
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin();
   if (isErrorResponse(auth)) return auth.response;
@@ -158,17 +161,17 @@ export async function POST(request: NextRequest) {
     const skipped: string[] = [];
 
     for (const s of students) {
-      const email = `${s.rollNo.toLowerCase()}@student.dept.edu`;
+      const username = s.rollNo.toLowerCase();
       const clash =
-        (await db.student.findUnique({ where: { email } })) ??
-        (await db.professor.findUnique({ where: { email } }));
+        (await db.student.findUnique({ where: { username } })) ??
+        (await db.professor.findUnique({ where: { username } }));
       if (clash) {
         skipped.push(s.rollNo);
         continue;
       }
       await db.student.update({
         where: { id: s.id },
-        data: { email, passwordHash: await hashPassword(s.rollNo) },
+        data: { username, passwordHash: await hashPassword(s.rollNo) },
       });
       enabled += 1;
     }
@@ -186,7 +189,7 @@ export async function POST(request: NextRequest) {
       enabled,
       skipped,
       programName: program.name,
-      pattern: "email = rollno@student.dept.edu, password = roll number",
+      pattern: "username = roll number (lowercase), password = roll number",
     });
   } catch (e) {
     console.error(e);

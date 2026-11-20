@@ -243,7 +243,7 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
   // Add professor dialog
   const [addProfOpen, setAddProfOpen] = useState(false);
   const [addProfName, setAddProfName] = useState("");
-  const [addProfEmail, setAddProfEmail] = useState("");
+  const [addProfUsername, setAddProfUsername] = useState("");
   const [addProfPassword, setAddProfPassword] = useState("");
   const [addProfRole, setAddProfRole] = useState<Role>("PROFESSOR");
   const [addProfBusy, setAddProfBusy] = useState(false);
@@ -290,7 +290,7 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
 
   function openAddProfessor() {
     setAddProfName("");
-    setAddProfEmail("");
+    setAddProfUsername("");
     setAddProfRole("PROFESSOR");
     setAddProfPassword(generatePassword());
     setAddProfOpen(true);
@@ -298,10 +298,10 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
 
   async function handleAddProfessor() {
     const name = addProfName.trim();
-    const email = addProfEmail.trim();
+    const username = addProfUsername.trim();
     const password = addProfPassword.trim();
-    if (!name || !email || !password) {
-      toast.error("Name, email, and password are all required");
+    if (!name || !username || !password) {
+      toast.error("Name, username, and password are all required");
       return;
     }
     setAddProfBusy(true);
@@ -309,7 +309,7 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
       const res = await fetch("/api/professors", {
         method: "POST",
         headers: JSON_HEADERS,
-        body: JSON.stringify({ name, email, password, role: addProfRole }),
+        body: JSON.stringify({ name, username, password, role: addProfRole }),
       });
       if (!res.ok) {
         throw new Error(
@@ -317,7 +317,7 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
         );
       }
       toast.success("Credentials ready — share them in person", {
-        description: `${name} · ${email} · password: ${password}`,
+        description: `${name} · ${username} · password: ${password}`,
       });
       setAddProfOpen(false);
       await professorsApi.reload();
@@ -686,7 +686,7 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
                   <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
+                      <TableHead>Username</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Courses</TableHead>
                       <TableHead>Status</TableHead>
@@ -703,7 +703,7 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
                           {professor.name}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {professor.email}
+                          {professor.username}
                         </TableCell>
                         <TableCell>
                           {professor.role === "ADMIN" ? (
@@ -960,7 +960,7 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
           <TabsContent value="students" className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">
               Give students read-only access to their own attendance. They sign
-              in with the email and password you set here.
+              in with the username and password you set here.
             </p>
             <StudentAccountsPanel />
           </TabsContent>
@@ -990,7 +990,7 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
               <DialogTitle>Add professor</DialogTitle>
               <DialogDescription>
                 Create a new account. Share the password with the professor in
-                person — it is never emailed.
+                person — the username and password are never sent electronically.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4">
@@ -1005,13 +1005,13 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="prof-email">Email</Label>
+                <Label htmlFor="prof-username">Username</Label>
                 <Input
-                  id="prof-email"
-                  type="email"
-                  value={addProfEmail}
-                  onChange={(event) => setAddProfEmail(event.target.value)}
-                  placeholder="professor@college.edu"
+                  id="prof-username"
+                  type="text"
+                  value={addProfUsername}
+                  onChange={(event) => setAddProfUsername(event.target.value)}
+                  placeholder="e.g. meera"
                 />
               </div>
               <div className="grid gap-2">
@@ -1092,7 +1092,7 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
               <DialogTitle>Reset password</DialogTitle>
               <DialogDescription>
                 Set a new password for {resetTarget?.name ?? "this account"} (
-                {resetTarget?.email ?? ""}).
+                {resetTarget?.username ?? ""}).
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-2">
