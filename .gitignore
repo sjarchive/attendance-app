@@ -62,4 +62,5 @@ server.log
 /mini-services/
 /Caddyfile
 /db/
-/PROJECT_CONTEXT.md
+/PROJECT_CONTEXT.mddocs/PROJECT_CONTEXT.md
+scripts/restore.sh
