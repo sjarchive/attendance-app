@@ -15,7 +15,20 @@ const COOKIE_NAME = "session";
 const SESSION_DAYS = 7;
 
 function getSecret(): Uint8Array {
-  const secret = process.env.AUTH_SECRET || "insecure-dev-secret-change-me";
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      // Fail closed: silently falling back to a known constant would let
+      // anyone forge session cookies with a publicly known secret.
+      throw new Error(
+        "AUTH_SECRET is not set. Generate one with `openssl rand -hex 32` and add it to the environment."
+      );
+    }
+    console.warn(
+      "[auth] AUTH_SECRET not set — using insecure dev secret. Never deploy like this."
+    );
+    return new TextEncoder().encode("insecure-dev-secret-change-me");
+  }
   return new TextEncoder().encode(secret);
 }
 
@@ -112,8 +125,9 @@ export const sessionCookieName = COOKIE_NAME;
 export const sessionCookieOptions = {
   httpOnly: true,
   sameSite: "lax" as const,
-  // Set to true behind HTTPS in production; the preview gateway may serve plain http.
-  secure: false,
+  // Secure in production (HTTPS); dev/preview may serve plain http.
+  // If you ever serve a production build over plain http, override this.
+  secure: process.env.NODE_ENV === "production",
   path: "/",
   maxAge: SESSION_DAYS * 24 * 60 * 60,
 };
