@@ -1,12 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { GraduationCap, LayoutDashboard, LogOut, ShieldCheck } from "lucide-react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import {
+  GraduationCap,
+  LayoutDashboard,
+  LogOut,
+  Moon,
+  ShieldCheck,
+  Sun,
+} from "lucide-react";
+import { useTheme } from "next-themes";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
 import { LoginScreen } from "@/components/attendance/login-screen";
 import { Dashboard } from "@/components/attendance/dashboard";
 import { AttendanceMarker } from "@/components/attendance/attendance-marker";
@@ -14,15 +30,68 @@ import { RosterManager } from "@/components/attendance/roster-manager";
 import { AdminPanel } from "@/components/attendance/admin-panel";
 import { ReportsView } from "@/components/attendance/reports-view";
 import { MyAttendance } from "@/components/attendance/my-attendance";
+import type { CourseSubView } from "@/components/attendance/course-header";
 import { apiFetch } from "@/lib/client";
+import {
+  buildViewQueryString,
+  parseViewSearchParams,
+  type AdminTabName,
+  type AppViewName,
+} from "@/lib/attendance-helpers";
 import type { BootStats, CourseWithDetails, SessionUser } from "@/lib/types";
 
 type View =
   | { name: "dashboard" }
-  | { name: "attendance"; course: CourseWithDetails }
-  | { name: "roster"; course: CourseWithDetails }
-  | { name: "reports"; course: CourseWithDetails }
-  | { name: "admin" };
+  | { name: "attendance"; courseId: string }
+  | { name: "roster"; courseId: string }
+  | { name: "reports"; courseId: string }
+  | { name: "admin"; tab: AdminTabName };
+
+function viewFromUrl(isAdmin: boolean): View {
+  if (typeof window === "undefined") return { name: "dashboard" };
+  const parsed = parseViewSearchParams(window.location.search);
+  if (parsed.view === "admin") {
+    return isAdmin ? { name: "admin", tab: parsed.adminTab } : { name: "dashboard" };
+  }
+  if (
+    (parsed.view === "attendance" ||
+      parsed.view === "roster" ||
+      parsed.view === "reports") &&
+    parsed.courseId
+  ) {
+    return { name: parsed.view, courseId: parsed.courseId };
+  }
+  return { name: "dashboard" };
+}
+
+const emptySubscribe = () => () => {};
+
+function ThemeToggleButton() {
+  const { resolvedTheme, setTheme } = useTheme();
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
+
+  const isDark = mounted && resolvedTheme === "dark";
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+    >
+      {isDark ? (
+        <Sun className="h-4 w-4" aria-hidden="true" />
+      ) : (
+        <Moon className="h-4 w-4" aria-hidden="true" />
+      )}
+    </Button>
+  );
+}
 
 export default function Home() {
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -31,6 +100,82 @@ export default function Home() {
   const [courses, setCourses] = useState<CourseWithDetails[]>([]);
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [uniqueStudents, setUniqueStudents] = useState(0);
+
+  // Unsaved-changes guard propagated from AttendanceMarker
+  const [attendanceDirty, setAttendanceDirty] = useState(false);
+  const [pendingNav, setPendingNav] = useState<(() => void) | null>(null);
+
+  const pushUrl = useCallback(
+    (next: View, replace = false) => {
+      if (typeof window === "undefined") return;
+      const qs = buildViewQueryString({
+        view: next.name as AppViewName,
+        courseId:
+          next.name === "attendance" ||
+          next.name === "roster" ||
+          next.name === "reports"
+            ? next.courseId
+            : null,
+        adminTab: next.name === "admin" ? next.tab : undefined,
+      });
+      const target = `${window.location.pathname}${qs}`;
+      if (`${window.location.pathname}${window.location.search}` === target) {
+        return;
+      }
+      if (replace) {
+        window.history.replaceState(null, "", target);
+      } else {
+        window.history.pushState(null, "", target);
+      }
+    },
+    []
+  );
+
+  const commitView = useCallback(
+    (next: View, options?: { replace?: boolean }) => {
+      setView(next);
+      if (next.name !== "attendance") {
+        setAttendanceDirty(false);
+      }
+      pushUrl(next, options?.replace ?? false);
+    },
+    [pushUrl]
+  );
+
+  const navigateWithGuard = useCallback(
+    (action: () => void) => {
+      if (attendanceDirty) {
+        setPendingNav(() => action);
+      } else {
+        action();
+      }
+    },
+    [attendanceDirty]
+  );
+
+  // Browser tab close / refresh protection when attendance has unsaved edits
+  useEffect(() => {
+    if (!attendanceDirty) return;
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [attendanceDirty]);
+
+  // Sync browser Back / Forward buttons with view state
+  useEffect(() => {
+    if (!user || user.role === "STUDENT") return;
+    function handlePopState() {
+      const next = viewFromUrl(user?.role === "ADMIN");
+      setView(next);
+      if (next.name !== "attendance") {
+        setAttendanceDirty(false);
+      }
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [user]);
 
   const refreshCourses = useCallback(async () => {
     setCoursesLoading(true);
@@ -42,7 +187,8 @@ export default function Home() {
       setCourses(data.courses);
       setUniqueStudents(data.stats?.students ?? 0);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load courses";
+      const message =
+        err instanceof Error ? err.message : "Failed to load courses";
       if (message.toLowerCase().includes("session")) {
         setUser(null);
       }
@@ -53,7 +199,6 @@ export default function Home() {
   }, []);
 
   // Session bootstrap: one request returns user + courses (see /api/boot).
-  // A 401/session-expiry later in the app falls back to refreshCourses' handler.
   useEffect(() => {
     (async () => {
       try {
@@ -66,6 +211,19 @@ export default function Home() {
         if (data.user && data.user.role !== "STUDENT") {
           setCourses(data.courses);
           setUniqueStudents(data.stats?.students ?? 0);
+          const initial = viewFromUrl(data.user.role === "ADMIN");
+          // If URL points to a course no longer accessible, fall back to dashboard
+          if (
+            (initial.name === "attendance" ||
+              initial.name === "roster" ||
+              initial.name === "reports") &&
+            !data.courses.some((c) => c.id === initial.courseId)
+          ) {
+            setView({ name: "dashboard" });
+            pushUrl({ name: "dashboard" }, true);
+          } else {
+            setView(initial);
+          }
         }
       } catch {
         setUser(null);
@@ -73,38 +231,67 @@ export default function Home() {
         setBooting(false);
       }
     })();
-  }, []);
+  }, [pushUrl]);
 
   const handleLogin = useCallback(
     (u: SessionUser) => {
       setUser(u);
-      setView({ name: "dashboard" });
+      commitView({ name: "dashboard" }, { replace: true });
       if (u.role !== "STUDENT") {
-        refreshCourses();
+        void refreshCourses();
       }
     },
-    [refreshCourses]
+    [commitView, refreshCourses]
   );
 
-  const handleLogout = useCallback(async () => {
+  const performLogout = useCallback(async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } catch {
       // ignore network errors on logout
     }
+    setAttendanceDirty(false);
     setUser(null);
-    setView({ name: "dashboard" });
+    commitView({ name: "dashboard" }, { replace: true });
     setCourses([]);
     setUniqueStudents(0);
     toast("You have been signed out");
-  }, []);
+  }, [commitView]);
+
+  const handleSessionExpired = useCallback(() => {
+    setAttendanceDirty(false);
+    setUser(null);
+    commitView({ name: "dashboard" }, { replace: true });
+    setCourses([]);
+    setUniqueStudents(0);
+  }, [commitView]);
+
+  const activeCourse =
+    view.name === "attendance" ||
+    view.name === "roster" ||
+    view.name === "reports"
+      ? courses.find((c) => c.id === view.courseId) ?? null
+      : null;
+
+  const handleCourseTabSelect = useCallback(
+    (tab: CourseSubView) => {
+      if (!activeCourse) return;
+      commitView({ name: tab, courseId: activeCourse.id });
+    },
+    [activeCourse, commitView]
+  );
 
   // ---- Boot screen -------------------------------------------------------
   if (booting) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3">
-        <GraduationCap className="h-8 w-8 text-emerald-600" aria-hidden="true" />
-        <p className="text-sm text-muted-foreground">Loading attendance system...</p>
+        <GraduationCap
+          className="h-8 w-8 text-emerald-600 dark:text-emerald-400"
+          aria-hidden="true"
+        />
+        <p className="text-sm text-muted-foreground">
+          Loading attendance system...
+        </p>
       </div>
     );
   }
@@ -119,27 +306,89 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-2 px-4 sm:gap-3">
-          <GraduationCap className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold leading-tight">
-              <span className="sm:hidden">Attendance</span>
-              <span className="hidden sm:inline">Department Attendance</span>
-            </p>
-            <p className="hidden truncate text-xs text-muted-foreground sm:block">
-              Student attendance tracking
-            </p>
-          </div>
+      {/* Unsaved attendance guard for top-level header navigation */}
+      <AlertDialog
+        open={pendingNav !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingNav(null);
+        }}
+      >
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved attendance?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved attendance changes on this screen. Leaving now
+              will discard those edits.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={() => {
+                const action = pendingNav;
+                setPendingNav(null);
+                setAttendanceDirty(false);
+                action?.();
+              }}
+            >
+              Discard changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-          <nav className="ml-auto flex shrink-0 items-center gap-1.5" aria-label="Main">
+      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4">
+          {/* Brand button returns to Dashboard */}
+          {isStudent ? (
+            <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
+              <GraduationCap
+                className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                aria-hidden="true"
+              />
+              <span className="text-sm font-semibold tracking-tight">
+                <span className="sm:hidden">Attendance</span>
+                <span className="hidden sm:inline">Department Attendance</span>
+              </span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() =>
+                navigateWithGuard(() => commitView({ name: "dashboard" }))
+              }
+              className="flex shrink-0 items-center gap-2 rounded-md py-1 pr-1 text-left whitespace-nowrap transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Department Attendance — Go to Dashboard"
+            >
+              <GraduationCap
+                className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                aria-hidden="true"
+              />
+              <span className="text-sm font-semibold tracking-tight">
+                <span className="sm:hidden">Attendance</span>
+                <span className="hidden sm:inline">Department Attendance</span>
+              </span>
+            </button>
+          )}
+
+          <nav
+            className="ml-auto flex shrink-0 items-center gap-1 sm:gap-1.5"
+            aria-label="Main"
+          >
             {!isStudent && view.name !== "dashboard" && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setView({ name: "dashboard" })}
+                className="whitespace-nowrap"
+                onClick={() =>
+                  navigateWithGuard(() => commitView({ name: "dashboard" }))
+                }
               >
-                <LayoutDashboard className="h-4 w-4 sm:mr-1.5" aria-hidden="true" />
+                <LayoutDashboard
+                  className="h-4 w-4 sm:mr-1.5"
+                  aria-hidden="true"
+                />
                 <span className="hidden sm:inline">Dashboard</span>
                 <span className="sr-only sm:hidden">Dashboard</span>
               </Button>
@@ -148,35 +397,44 @@ export default function Home() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setView({ name: "admin" })}
+                className="whitespace-nowrap"
+                onClick={() =>
+                  navigateWithGuard(() =>
+                    commitView({ name: "admin", tab: "professors" })
+                  )
+                }
                 title="Admin panel"
               >
-                <ShieldCheck className="h-4 w-4 sm:mr-1.5" aria-hidden="true" />
+                <ShieldCheck
+                  className="h-4 w-4 sm:mr-1.5"
+                  aria-hidden="true"
+                />
                 <span className="hidden sm:inline">Admin</span>
                 <span className="sr-only sm:hidden">Admin</span>
               </Button>
             )}
-            <Separator orientation="vertical" className="mx-1 hidden h-6 sm:block" />
+
+            <ThemeToggleButton />
+
+            <Separator
+              orientation="vertical"
+              className="mx-1 hidden h-6 sm:block"
+            />
             <div className="hidden text-right md:block">
               <p className="text-xs font-medium leading-tight">{user.name}</p>
               <p className="text-[11px] leading-tight text-muted-foreground">
-                {user.username}
+                {user.role === "ADMIN"
+                  ? "Admin"
+                  : user.role === "PROFESSOR"
+                    ? "Professor"
+                    : "Student"}{" "}
+                · {user.username}
               </p>
             </div>
-            <Badge
-              variant="outline"
-              className={
-                isAdmin
-                  ? "border-violet-200 bg-violet-50 text-[10px] font-semibold text-violet-700"
-                  : "text-[10px] font-semibold text-muted-foreground"
-              }
-            >
-              {user.role}
-            </Badge>
             <Button
               variant="ghost"
               size="icon"
-              onClick={handleLogout}
+              onClick={() => navigateWithGuard(() => void performLogout())}
               aria-label="Log out"
               title="Log out"
             >
@@ -187,7 +445,7 @@ export default function Home() {
       </header>
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
-        {isStudent && <MyAttendance />}
+        {isStudent && <MyAttendance onSessionExpired={handleSessionExpired} />}
 
         {!isStudent && view.name === "dashboard" && (
           <Dashboard
@@ -195,37 +453,60 @@ export default function Home() {
             courses={courses}
             uniqueStudents={uniqueStudents}
             loading={coursesLoading}
-            onMarkAttendance={(course) => setView({ name: "attendance", course })}
-            onManageRoster={(course) => setView({ name: "roster", course })}
-            onViewReports={(course) => setView({ name: "reports", course })}
+            onMarkAttendance={(course) =>
+              commitView({ name: "attendance", courseId: course.id })
+            }
+            onManageRoster={(course) =>
+              commitView({ name: "roster", courseId: course.id })
+            }
+            onViewReports={(course) =>
+              commitView({ name: "reports", courseId: course.id })
+            }
+            onOpenAdmin={
+              isAdmin
+                ? () => commitView({ name: "admin", tab: "professors" })
+                : undefined
+            }
             onRefresh={refreshCourses}
           />
         )}
 
-        {view.name === "attendance" && (
+        {!isStudent && view.name === "attendance" && activeCourse && (
           <AttendanceMarker
-            course={view.course}
-            onBack={() => setView({ name: "dashboard" })}
+            course={activeCourse}
+            onBack={() => commitView({ name: "dashboard" })}
+            onSelectTab={handleCourseTabSelect}
+            onDirtyChange={setAttendanceDirty}
+            onSaved={refreshCourses}
           />
         )}
 
-        {view.name === "roster" && (
+        {!isStudent && view.name === "roster" && activeCourse && (
           <RosterManager
-            course={view.course}
+            course={activeCourse}
             onChanged={refreshCourses}
-            onBack={() => setView({ name: "dashboard" })}
+            onBack={() => commitView({ name: "dashboard" })}
+            onSelectTab={handleCourseTabSelect}
           />
         )}
 
-        {view.name === "reports" && (
+        {!isStudent && view.name === "reports" && activeCourse && (
           <ReportsView
-            course={view.course}
-            onBack={() => setView({ name: "dashboard" })}
+            course={activeCourse}
+            onBack={() => commitView({ name: "dashboard" })}
+            onSelectTab={handleCourseTabSelect}
           />
         )}
 
-        {view.name === "admin" && (
-          <AdminPanel onChanged={refreshCourses} />
+        {!isStudent && view.name === "admin" && isAdmin && (
+          <AdminPanel
+            activeTab={view.tab}
+            onTabChange={(tab) =>
+              commitView({ name: "admin", tab }, { replace: true })
+            }
+            onBack={() => commitView({ name: "dashboard" })}
+            onChanged={refreshCourses}
+          />
         )}
       </main>
 

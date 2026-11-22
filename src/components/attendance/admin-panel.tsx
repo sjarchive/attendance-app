@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
+  ArrowLeft,
   BanIcon,
   BookOpenIcon,
   CircleCheckIcon,
@@ -28,15 +29,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -73,6 +67,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StudentAccountsPanel } from "@/components/attendance/student-accounts-panel";
 import { AuditAdminPanel } from "@/components/attendance/audit-list";
+import {
+  CredentialsDialog,
+  type IssuedCredentials,
+} from "@/components/attendance/credentials-dialog";
+import type { AdminTabName } from "@/lib/attendance-helpers";
 import type {
   CourseWithDetails,
   ProfessorAccount,
@@ -82,6 +81,9 @@ import type {
 
 export interface AdminPanelProps {
   onChanged?: () => void;
+  onBack?: () => void;
+  activeTab?: AdminTabName;
+  onTabChange?: (tab: AdminTabName) => void;
 }
 
 const JSON_HEADERS = { "Content-Type": "application/json" } as const;
@@ -225,7 +227,12 @@ function EmptyState({
   );
 }
 
-export function AdminPanel({ onChanged }: AdminPanelProps) {
+export function AdminPanel({
+  onChanged,
+  onBack,
+  activeTab = "professors",
+  onTabChange,
+}: AdminPanelProps) {
   const professorsApi = useApiList<ProfessorAccount>(
     "/api/professors",
     pickProfessors,
@@ -239,6 +246,9 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
   const professors = professorsApi.data ?? [];
   const programs = programsApi.data ?? [];
   const courses = coursesApi.data ?? [];
+
+  const [issuedCredentials, setIssuedCredentials] =
+    useState<IssuedCredentials | null>(null);
 
   // Add professor dialog
   const [addProfOpen, setAddProfOpen] = useState(false);
@@ -316,10 +326,14 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
           await getErrorMessage(res, "Could not create the account"),
         );
       }
-      toast.success("Credentials ready — share them in person", {
-        description: `${name} · ${username} · password: ${password}`,
-      });
       setAddProfOpen(false);
+      setIssuedCredentials({
+        title: "Account created",
+        recipientName: name,
+        username,
+        password,
+        note: `Share these credentials with ${name} in person — they are not sent electronically.`,
+      });
       await professorsApi.reload();
       onChanged?.();
     } catch (err) {
@@ -358,10 +372,15 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
           await getErrorMessage(res, "Could not reset the password"),
         );
       }
-      toast.success(`Password reset for ${resetTarget.name}`, {
-        description: `New password: ${password} — share it in person`,
-      });
+      const target = resetTarget;
       setResetTarget(null);
+      setIssuedCredentials({
+        title: "Password reset",
+        recipientName: target.name,
+        username: target.username,
+        password,
+        note: `Share this new password with ${target.name} in person.`,
+      });
       await professorsApi.reload();
       onChanged?.();
     } catch (err) {
@@ -618,15 +637,40 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
     "bg-emerald-600 text-white hover:bg-emerald-700";
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Administration</CardTitle>
-        <CardDescription>
-          Manage professor accounts, academic programs, and course offerings.
-        </CardDescription>
-      </CardHeader>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-start gap-2.5 sm:gap-3">
+          {onBack && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onBack}
+              aria-label="Back to dashboard"
+              title="Back to dashboard"
+              className="mt-0.5 h-9 w-9 shrink-0"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          )}
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
+              Department Administration
+            </h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Manage faculty accounts, academic programs, courses, student logins,
+              and audit history.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <Card>
       <CardContent className="p-4 md:p-6">
-        <Tabs defaultValue="professors" className="gap-4">
+        <Tabs
+          value={activeTab}
+          onValueChange={(val) => onTabChange?.(val as AdminTabName)}
+          className="gap-4"
+        >
           <div className="-mx-1 w-full overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <TabsList className="w-fit">
               <TabsTrigger value="professors">
@@ -681,16 +725,16 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
                 description="Create the first account so someone can manage courses and attendance."
               />
             ) : (
-              <div className="overflow-auto rounded-md border sm:max-h-96">
+              <div className="overflow-x-auto rounded-md border">
                 <Table>
-                  <TableHeader className="sticky top-0 z-10 bg-background">
-                    <TableRow>
-                      <TableHead>Name</TableHead>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="pl-4">Name</TableHead>
                       <TableHead>Username</TableHead>
                       <TableHead>Role</TableHead>
-                      <TableHead>Courses</TableHead>
+                      <TableHead className="text-right">Courses</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="pr-4 text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -699,39 +743,38 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
                         key={professor.id}
                         className={professor.active ? undefined : "opacity-70"}
                       >
-                        <TableCell className="font-medium">
+                        <TableCell className="pl-4 font-medium">
                           {professor.name}
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
+                        <TableCell className="font-mono text-xs text-muted-foreground sm:text-sm">
                           {professor.username}
                         </TableCell>
                         <TableCell>
                           {professor.role === "ADMIN" ? (
-                            <Badge className="border-transparent bg-violet-600 text-white">
+                            <span className="inline-flex items-center rounded-md border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 dark:border-violet-800/60 dark:bg-violet-950/50 dark:text-violet-300">
                               Admin
-                            </Badge>
+                            </span>
                           ) : (
-                            <Badge variant="secondary">Professor</Badge>
+                            <span className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                              Professor
+                            </span>
                           )}
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
+                        <TableCell className="text-right font-mono text-sm text-muted-foreground tabular-nums">
                           {professor.courseCount}
                         </TableCell>
                         <TableCell>
                           {professor.active ? (
-                            <Badge className="border-transparent bg-emerald-600 text-white">
+                            <span className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/50 dark:text-emerald-300">
                               Active
-                            </Badge>
+                            </span>
                           ) : (
-                            <Badge
-                              variant="outline"
-                              className="border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
-                            >
+                            <span className="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 dark:border-red-900/60 dark:bg-red-950/50 dark:text-red-300">
                               Disabled
-                            </Badge>
+                            </span>
                           )}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="pr-4">
                           <div className="flex justify-end">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -812,29 +855,29 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
                 description="Programs group courses and their students. Add the first one to get started."
               />
             ) : (
-              <div className="overflow-auto rounded-md border sm:max-h-96">
+              <div className="overflow-x-auto rounded-md border">
                 <Table>
-                  <TableHeader className="sticky top-0 z-10 bg-background">
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Courses</TableHead>
-                      <TableHead>Students</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="pl-4">Name</TableHead>
+                      <TableHead className="text-right">Courses</TableHead>
+                      <TableHead className="text-right">Students</TableHead>
+                      <TableHead className="pr-4 text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {programs.map((program) => (
                       <TableRow key={program.id}>
-                        <TableCell className="font-medium">
+                        <TableCell className="pl-4 font-medium">
                           {program.name}
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
+                        <TableCell className="text-right font-mono text-sm text-muted-foreground tabular-nums">
                           {program.courseCount}
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
+                        <TableCell className="text-right font-mono text-sm text-muted-foreground tabular-nums">
                           {program.studentCount}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="pr-4">
                           <div className="flex justify-end gap-2">
                             <Button
                               variant="outline"
@@ -892,28 +935,25 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
                 description="Create a course and assign it to a program and a professor."
               />
             ) : (
-              <div className="overflow-auto rounded-md border sm:max-h-96">
+              <div className="overflow-x-auto rounded-md border">
                 <Table>
-                  <TableHeader className="sticky top-0 z-10 bg-background">
-                    <TableRow>
-                      <TableHead>Code</TableHead>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="pl-4">Code</TableHead>
                       <TableHead>Title</TableHead>
                       <TableHead>Program</TableHead>
                       <TableHead>Professor</TableHead>
-                      <TableHead>Students</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-right">Students</TableHead>
+                      <TableHead className="pr-4 text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {courses.map((course) => (
                       <TableRow key={course.id}>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className="border-emerald-600/40 bg-emerald-50 font-mono text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                          >
+                        <TableCell className="pl-4">
+                          <span className="font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                             {course.code}
-                          </Badge>
+                          </span>
                         </TableCell>
                         <TableCell className="font-medium">
                           {course.title}
@@ -924,10 +964,10 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
                         <TableCell className="text-muted-foreground">
                           {course.professorName}
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
+                        <TableCell className="text-right font-mono text-sm text-muted-foreground tabular-nums">
                           {course.studentCount}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="pr-4">
                           <div className="flex justify-end gap-2">
                             <Button
                               variant="outline"
@@ -1460,7 +1500,13 @@ export function AdminPanel({ onChanged }: AdminPanelProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Post-save copyable credentials modal */}
+      <CredentialsDialog
+        credentials={issuedCredentials}
+        onClose={() => setIssuedCredentials(null)}
+      />
     </Card>
+    </div>
   );
 }
 

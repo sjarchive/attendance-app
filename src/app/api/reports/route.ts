@@ -56,6 +56,10 @@ export async function GET(request: NextRequest) {
       string,
       Record<"PRESENT" | "ABSENT" | "LATE" | "LEAVE", number>
     >();
+    const byDate = new Map<
+      string,
+      Record<"PRESENT" | "ABSENT" | "LATE" | "LEAVE", number>
+    >();
     const markedDates = new Set<string>();
     let totalMarked = 0;
     let totalPresent = 0;
@@ -68,13 +72,37 @@ export async function GET(request: NextRequest) {
         LATE: 0,
         LEAVE: 0,
       };
+      const d = byDate.get(r.date) ?? {
+        PRESENT: 0,
+        ABSENT: 0,
+        LATE: 0,
+        LEAVE: 0,
+      };
       if (r.status === "PRESENT" || r.status === "ABSENT" || r.status === "LATE" || r.status === "LEAVE") {
         s[r.status] += 1;
+        d[r.status] += 1;
       }
       stats.set(r.studentId, s);
+      byDate.set(r.date, d);
       totalMarked += 1;
       if (r.status === "PRESENT") totalPresent += 1;
     }
+
+    const dailyTrend = Array.from(byDate.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, d]) => {
+        const total = d.PRESENT + d.ABSENT + d.LATE + d.LEAVE;
+        return {
+          date,
+          present: d.PRESENT,
+          absent: d.ABSENT,
+          late: d.LATE,
+          leave: d.LEAVE,
+          total,
+          percentage:
+            total === 0 ? 0 : Math.round((d.PRESENT / total) * 1000) / 10,
+        };
+      });
 
     const studentIds = new Set([
       ...stats.keys(),
@@ -116,6 +144,7 @@ export async function GET(request: NextRequest) {
       from: from ?? null,
       to: to ?? null,
       rows,
+      dailyTrend,
       summary: {
         classAverage:
           totalMarked === 0

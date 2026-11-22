@@ -72,6 +72,8 @@ export interface CourseWithDetails {
   professorId: string;
   professorName: string;
   studentCount: number;
+  todayMarkedCount?: number;
+  todayPresentCount?: number;
 }
 
 export interface ProfessorAccount {
@@ -127,11 +129,22 @@ export interface ReportRow {
   percentage: number; // present / total * 100, rounded to 1 decimal
 }
 
+export interface DailyTrendPoint {
+  date: string;
+  present: number;
+  absent: number;
+  late: number;
+  leave: number;
+  total: number;
+  percentage: number;
+}
+
 export interface ReportResponse {
   course: { id: string; code: string; title: string; programName: string };
   from: string | null;
   to: string | null;
   rows: ReportRow[];
+  dailyTrend?: DailyTrendPoint[];
   summary: {
     classAverage: number; // % across all marked days in range
     markedDays: number; // distinct dates with records in range
@@ -150,6 +163,11 @@ export interface ImportSummary {
   errors: { line: number; message: string }[]; // capped at 50
 }
 
+export interface StudentAttendanceHistoryItem {
+  date: string; // YYYY-MM-DD
+  status: AttendanceStatus;
+}
+
 export interface StudentCourseSummary {
   courseId: string;
   code: string;
@@ -162,6 +180,7 @@ export interface StudentCourseSummary {
   leave: number;
   percentage: number;
   lastMarked: string | null; // YYYY-MM-DD
+  history?: StudentAttendanceHistoryItem[];
 }
 
 export interface MyAttendanceResponse {

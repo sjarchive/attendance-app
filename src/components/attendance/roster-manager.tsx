@@ -1,17 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CsvImportDialog } from "@/components/attendance/csv-import-dialog";
 import {
-  ArrowLeftIcon,
-  PencilIcon,
-  PlusIcon,
-  RotateCcwIcon,
-  Trash2Icon,
-  UsersIcon,
+  CourseHeader,
+  type CourseSubView,
+} from "@/components/attendance/course-header";
+import {
+  Pencil,
+  Plus,
+  RotateCcw,
+  Search,
+  Trash2,
+  Users,
+  X,
 } from "lucide-react";
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +26,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -51,17 +54,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { CourseWithDetails, RosterStudent } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 export interface RosterManagerProps {
   course: CourseWithDetails;
   onChanged?: () => void;
-  onBack?: () => void;
+  onBack: () => void;
+  onSelectTab: (tab: CourseSubView) => void;
 }
+
+type StatusFilter = "ALL" | "ACTIVE" | "REMOVED";
 
 /** Extract the server-provided error message from a failed response body ({ error }). */
 async function getErrorMessage(
   res: Response,
-  fallback: string,
+  fallback: string
 ): Promise<string> {
   try {
     const payload = (await res.json()) as { error?: unknown };
@@ -76,7 +83,7 @@ async function getErrorMessage(
 
 function sortRoster(students: RosterStudent[]): RosterStudent[] {
   return [...students].sort((a, b) =>
-    a.rollNo.localeCompare(b.rollNo, undefined, { numeric: true }),
+    a.rollNo.localeCompare(b.rollNo, undefined, { numeric: true })
   );
 }
 
@@ -84,9 +91,12 @@ export function RosterManager({
   course,
   onChanged,
   onBack,
+  onSelectTab,
 }: RosterManagerProps) {
   const [students, setStudents] = useState<RosterStudent[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
 
   // Add-student dialog
   const [addOpen, setAddOpen] = useState(false);
@@ -109,10 +119,12 @@ export function RosterManager({
     try {
       const res = await fetch(
         `/api/students?courseId=${encodeURIComponent(course.id)}`,
-        { cache: "no-store" },
+        { cache: "no-store" }
       );
       if (!res.ok) {
-        throw new Error(await getErrorMessage(res, "Failed to load the roster"));
+        throw new Error(
+          await getErrorMessage(res, "Failed to load the roster")
+        );
       }
       const data = (await res.json()) as { students: RosterStudent[] };
       setStudents(sortRoster(data.students));
@@ -128,9 +140,33 @@ export function RosterManager({
     void loadStudents();
   }, [loadStudents]);
 
-  const activeCount = students
-    ? students.filter((student) => student.active).length
-    : course.studentCount;
+  const activeCount = useMemo(
+    () =>
+      students
+        ? students.filter((student) => student.active).length
+        : course.studentCount,
+    [students, course.studentCount]
+  );
+
+  const removedCount = useMemo(
+    () =>
+      students ? students.filter((student) => !student.active).length : 0,
+    [students]
+  );
+
+  const filteredStudents = useMemo(() => {
+    if (!students) return [];
+    const q = search.trim().toLowerCase();
+    return students.filter((student) => {
+      if (statusFilter === "ACTIVE" && !student.active) return false;
+      if (statusFilter === "REMOVED" && student.active) return false;
+      if (!q) return true;
+      return (
+        student.name.toLowerCase().includes(q) ||
+        student.rollNo.toLowerCase().includes(q)
+      );
+    });
+  }, [students, search, statusFilter]);
 
   async function handleAdd() {
     const rollNo = addRollNo.trim();
@@ -148,7 +184,7 @@ export function RosterManager({
       });
       if (!res.ok) {
         throw new Error(
-          await getErrorMessage(res, `Could not add "${name}" to the roster`),
+          await getErrorMessage(res, `Could not add "${name}" to the roster`)
         );
       }
       setAddOpen(false);
@@ -161,7 +197,7 @@ export function RosterManager({
       toast.error(
         err instanceof Error
           ? err.message
-          : `Could not add "${name}" to the roster`,
+          : `Could not add "${name}" to the roster`
       );
     } finally {
       setAddBusy(false);
@@ -190,11 +226,11 @@ export function RosterManager({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ courseId: course.id, name, rollNo }),
-        },
+        }
       );
       if (!res.ok) {
         throw new Error(
-          await getErrorMessage(res, "Could not update the student"),
+          await getErrorMessage(res, "Could not update the student")
         );
       }
       setEditTarget(null);
@@ -203,7 +239,7 @@ export function RosterManager({
       onChanged?.();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Could not update the student",
+        err instanceof Error ? err.message : "Could not update the student"
       );
     } finally {
       setEditBusy(false);
@@ -216,22 +252,22 @@ export function RosterManager({
     try {
       const res = await fetch(
         `/api/students/${encodeURIComponent(removeTarget.studentId)}?courseId=${encodeURIComponent(course.id)}`,
-        { method: "DELETE" },
+        { method: "DELETE" }
       );
       if (!res.ok) {
         throw new Error(
-          await getErrorMessage(res, "Could not remove the student"),
+          await getErrorMessage(res, "Could not remove the student")
         );
       }
       toast.success(
-        `"${removeTarget.name}" removed from the roster — attendance history kept`,
+        `"${removeTarget.name}" removed from the roster — attendance history kept`
       );
       setRemoveTarget(null);
       await loadStudents();
       onChanged?.();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Could not remove the student",
+        err instanceof Error ? err.message : "Could not remove the student"
       );
     } finally {
       setRemoveBusy(false);
@@ -240,7 +276,6 @@ export function RosterManager({
 
   async function handleRestore(student: RosterStudent) {
     try {
-      // Re-posting the same roll number re-activates the existing enrollment.
       const res = await fetch("/api/students", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -252,7 +287,7 @@ export function RosterManager({
       });
       if (!res.ok) {
         throw new Error(
-          await getErrorMessage(res, "Could not restore the student"),
+          await getErrorMessage(res, "Could not restore the student")
         );
       }
       toast.success(`"${student.name}" restored to the roster`);
@@ -260,144 +295,222 @@ export function RosterManager({
       onChanged?.();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Could not restore the student",
+        err instanceof Error ? err.message : "Could not restore the student"
       );
     }
   }
 
-  const dialogBodyClass = "grid gap-4";
+  const courseWithFreshCount = useMemo(
+    () => ({ ...course, studentCount: activeCount }),
+    [course, activeCount]
+  );
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Header: back navigation + course context */}
-      <div className="flex flex-wrap items-center gap-3">
-        {onBack ? (
-          <Button variant="outline" size="sm" onClick={onBack}>
-            <ArrowLeftIcon />
-            Back
-          </Button>
-        ) : null}
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Badge className="border-transparent bg-emerald-600 text-white">
-            {course.code}
-          </Badge>
-          <h2 className="text-base font-semibold leading-none">
-            {course.title}
-          </h2>
-          <Badge variant="secondary">{course.programName}</Badge>
-          <Badge variant="outline" className="gap-1 font-normal">
-            <UsersIcon />
-            {activeCount} {activeCount === 1 ? "student" : "students"}
-          </Badge>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <CourseHeader
+        course={courseWithFreshCount}
+        activeTab="roster"
+        onBack={onBack}
+        onSelectTab={onSelectTab}
+        actions={
+          <>
+            <CsvImportDialog
+              courseId={course.id}
+              onImported={() => {
+                void loadStudents();
+                onChanged?.();
+              }}
+            />
+            <Button
+              size="sm"
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+              onClick={() => setAddOpen(true)}
+            >
+              <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              Add student
+            </Button>
+          </>
+        }
+      />
 
       <Card>
-        <CardHeader className="border-b">
-          <div className="flex flex-col gap-3 sm:grid sm:grid-cols-[1fr_auto] sm:items-start sm:gap-1.5">
-            <div className="min-w-0 space-y-1.5">
-              <CardTitle>Student roster</CardTitle>
-              <CardDescription>
+        <CardHeader className="gap-3 border-b pb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <CardTitle className="text-base">Student roster</CardTitle>
+              <CardDescription className="mt-1 text-xs">
                 Add, edit, or soft-remove students. Removed students keep their
                 attendance history and can be restored.
               </CardDescription>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <CsvImportDialog
-                courseId={course.id}
-                onImported={() => {
-                  void loadStudents();
-                  onChanged?.();
-                }}
-              />
-              <Button
-                className="bg-emerald-600 text-white hover:bg-emerald-700"
-                onClick={() => setAddOpen(true)}
-              >
-                <PlusIcon />
-                Add student
-              </Button>
-            </div>
+
+            {students && students.length > 0 && (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="relative w-full sm:w-52">
+                  <Search
+                    className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <Input
+                    type="search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search name or roll..."
+                    aria-label="Search roster by name or roll number"
+                    className="h-8 pl-8 pr-7 text-xs"
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => setSearch("")}
+                      aria-label="Clear search"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
+
+                {removedCount > 0 && (
+                  <div
+                    role="group"
+                    aria-label="Filter roster status"
+                    className="inline-flex items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5"
+                  >
+                    {(
+                      [
+                        { id: "ALL", label: `All (${students.length})` },
+                        { id: "ACTIVE", label: `Active (${activeCount})` },
+                        { id: "REMOVED", label: `Removed (${removedCount})` },
+                      ] as const
+                    ).map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        aria-pressed={statusFilter === opt.id}
+                        onClick={() => setStatusFilter(opt.id)}
+                        className={cn(
+                          "rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors tabular-nums",
+                          statusFilter === opt.id
+                            ? "bg-background text-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </CardHeader>
-        <CardContent className="p-4 md:p-6">
+
+        <CardContent className="p-0">
           {students === null && loadError ? (
-            <div className="flex flex-col items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/40">
+            <div className="m-4 flex flex-col items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/40">
               <p className="text-sm text-red-700 dark:text-red-300">
                 {loadError}
               </p>
-              <Button variant="outline" size="sm" onClick={() => void loadStudents()}>
-                <RotateCcwIcon />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void loadStudents()}
+              >
+                <RotateCcw className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 Try again
               </Button>
             </div>
           ) : students === null ? (
-            <div className="space-y-3">
+            <div className="space-y-3 p-4">
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
             </div>
           ) : students.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-10 text-center">
-              <div className="flex size-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950">
-                <UsersIcon className="size-6" />
+            <div className="flex flex-col items-center justify-center gap-3 p-10 text-center">
+              <div className="flex size-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
+                <Users className="size-6" aria-hidden="true" />
               </div>
               <p className="text-sm font-medium">No students yet</p>
               <p className="max-w-sm text-sm text-muted-foreground">
-                This course has an empty roster. Add the first student to start
-                tracking attendance.
+                This course has an empty roster. Add the first student or import
+                a CSV to start tracking attendance.
               </p>
               <Button
+                size="sm"
                 className="bg-emerald-600 text-white hover:bg-emerald-700"
                 onClick={() => setAddOpen(true)}
               >
-                <PlusIcon />
+                <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 Add the first student
               </Button>
             </div>
+          ) : filteredStudents.length === 0 ? (
+            <div className="p-10 text-center">
+              <p className="text-sm font-medium">No matching students</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Try adjusting your search or status filter.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-3"
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("ALL");
+                }}
+              >
+                Reset filters
+              </Button>
+            </div>
           ) : (
-            <div className="overflow-auto rounded-md border sm:max-h-96">
+            <div className="overflow-x-auto">
               <Table>
-                <TableHeader className="sticky top-0 z-10 bg-background">
-                  <TableRow>
-                    <TableHead className="hidden sm:table-cell">Roll No</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="hidden sm:table-cell">Marked days</TableHead>
+                <TableHeader className="bg-muted/30">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="hidden pl-4 sm:table-cell">
+                      Roll No
+                    </TableHead>
+                    <TableHead className="pl-4 sm:pl-2">Name</TableHead>
+                    <TableHead className="hidden text-right sm:table-cell">
+                      Marked days
+                    </TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="pr-4 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {students.map((student) => (
+                  {filteredStudents.map((student) => (
                     <TableRow
                       key={student.studentId}
                       className={student.active ? undefined : "opacity-70"}
                     >
-                      <TableCell className="hidden font-mono text-sm sm:table-cell">
+                      <TableCell className="hidden pl-4 font-mono text-sm tabular-nums sm:table-cell">
                         {student.rollNo}
                       </TableCell>
-                      <TableCell className="font-medium">
+                      <TableCell className="pl-4 font-medium sm:pl-2">
                         <p className="leading-tight">{student.name}</p>
-                        <p className="font-mono text-xs leading-tight text-muted-foreground sm:hidden">
+                        <p className="font-mono text-xs leading-tight text-muted-foreground tabular-nums sm:hidden">
                           {student.rollNo}
                         </p>
                       </TableCell>
-                      <TableCell className="hidden font-mono text-sm text-muted-foreground sm:table-cell">
+                      <TableCell className="hidden text-right font-mono text-sm text-muted-foreground tabular-nums sm:table-cell">
                         {student.markedDays}
                       </TableCell>
                       <TableCell>
                         {student.active ? (
-                          <Badge className="border-transparent bg-emerald-600 text-white">
+                          <span className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/50 dark:text-emerald-300">
                             Active
-                          </Badge>
+                          </span>
                         ) : (
-                          <Badge className="border-transparent bg-stone-200 text-stone-600 dark:bg-stone-800 dark:text-stone-300">
+                          <span className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                             Removed
-                          </Badge>
+                          </span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="pr-4">
                         <div className="flex justify-end gap-2">
                           {student.active ? (
                             <>
@@ -407,17 +520,23 @@ export function RosterManager({
                                 aria-label={`Edit ${student.name}`}
                                 onClick={() => openEdit(student)}
                               >
-                                <PencilIcon />
+                                <Pencil
+                                  className="h-3.5 w-3.5 sm:mr-1.5"
+                                  aria-hidden="true"
+                                />
                                 <span className="hidden sm:inline">Edit</span>
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 aria-label={`Remove ${student.name}`}
-                                className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
+                                className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/50"
                                 onClick={() => setRemoveTarget(student)}
                               >
-                                <Trash2Icon />
+                                <Trash2
+                                  className="h-3.5 w-3.5 sm:mr-1.5"
+                                  aria-hidden="true"
+                                />
                                 <span className="hidden sm:inline">Remove</span>
                               </Button>
                             </>
@@ -426,10 +545,13 @@ export function RosterManager({
                               variant="outline"
                               size="sm"
                               aria-label={`Restore ${student.name}`}
-                              className="text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:hover:bg-emerald-950"
+                              className="text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
                               onClick={() => void handleRestore(student)}
                             >
-                              <RotateCcwIcon />
+                              <RotateCcw
+                                className="h-3.5 w-3.5 sm:mr-1.5"
+                                aria-hidden="true"
+                              />
                               <span className="hidden sm:inline">Restore</span>
                             </Button>
                           )}
@@ -448,7 +570,7 @@ export function RosterManager({
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="sm:max-w-sm">
           <form
-            className={dialogBodyClass}
+            className="grid gap-4"
             onSubmit={(event) => {
               event.preventDefault();
               void handleAdd();
@@ -495,7 +617,7 @@ export function RosterManager({
                 className="bg-emerald-600 text-white hover:bg-emerald-700"
                 disabled={addBusy}
               >
-                <PlusIcon />
+                <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 {addBusy ? "Adding..." : "Add student"}
               </Button>
             </DialogFooter>
@@ -512,7 +634,7 @@ export function RosterManager({
       >
         <DialogContent className="sm:max-w-sm">
           <form
-            className={dialogBodyClass}
+            className="grid gap-4"
             onSubmit={(event) => {
               event.preventDefault();
               void handleEdit();
@@ -574,11 +696,13 @@ export function RosterManager({
       >
         <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove &quot;{removeTarget?.name}&quot;?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Remove &quot;{removeTarget?.name}&quot;?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               The student will be removed from the {course.code} roster, but
-              their past attendance is preserved. You can restore them later by
-              re-adding the same roll number.
+              their past attendance is preserved. You can restore them later at
+              any time.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -591,7 +715,7 @@ export function RosterManager({
                 void handleRemove();
               }}
             >
-              <Trash2Icon />
+              <Trash2 className="mr-1.5 h-4 w-4" aria-hidden="true" />
               {removeBusy ? "Removing..." : "Remove student"}
             </AlertDialogAction>
           </AlertDialogFooter>

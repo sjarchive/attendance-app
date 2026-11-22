@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { requireUser, requireAdmin, isErrorResponse } from "@/lib/auth";
 import { json, badRequest, conflict, serverError } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
+import { todayStr } from "@/lib/date";
 import type { CourseWithDetails } from "@/lib/types";
 
 // GET /api/courses — professor: own courses; admin: all courses
@@ -13,10 +14,12 @@ export async function GET() {
   const { user } = auth;
 
   try {
-    // Course list and the unique headcount are independent -> run in parallel.
-    const [courses, uniqueStudents] = await Promise.all([
+    const today = todayStr();
+    const courseWhere = user.role === "ADMIN" ? {} : { professorId: user.id };
+    // Course list, unique headcount, and today's attendance counts run in parallel.
+    const [courses, uniqueStudents, todayCounts] = await Promise.all([
       db.course.findMany({
-        where: user.role === "ADMIN" ? {} : { professorId: user.id },
+        where: courseWhere,
         include: {
           program: true,
           professor: true,
@@ -35,18 +38,39 @@ export async function GET() {
               },
             },
           }),
+      db.attendanceRecord.groupBy({
+        by: ["courseId", "status"],
+        where: {
+          date: today,
+          ...(user.role === "ADMIN" ? {} : { course: { professorId: user.id } }),
+        },
+        _count: { _all: true },
+      }),
     ]);
 
-    const payload: CourseWithDetails[] = courses.map((c) => ({
-      id: c.id,
-      code: c.code,
-      title: c.title,
-      programId: c.programId,
-      programName: c.program.name,
-      professorId: c.professorId,
-      professorName: c.professor.name,
-      studentCount: c._count.enrollments,
-    }));
+    const todaySummary = new Map<string, { marked: number; present: number }>();
+    for (const row of todayCounts) {
+      const curr = todaySummary.get(row.courseId) ?? { marked: 0, present: 0 };
+      curr.marked += row._count._all;
+      if (row.status === "PRESENT") curr.present += row._count._all;
+      todaySummary.set(row.courseId, curr);
+    }
+
+    const payload: CourseWithDetails[] = courses.map((c) => {
+      const t = todaySummary.get(c.id);
+      return {
+        id: c.id,
+        code: c.code,
+        title: c.title,
+        programId: c.programId,
+        programName: c.program.name,
+        professorId: c.professorId,
+        professorName: c.professor.name,
+        studentCount: c._count.enrollments,
+        todayMarkedCount: t?.marked ?? 0,
+        todayPresentCount: t?.present ?? 0,
+      };
+    });
     return json({ courses: payload, stats: { students: uniqueStudents } });
   } catch (e) {
     console.error(e);

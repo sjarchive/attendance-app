@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { json, serverError } from "@/lib/api";
+import { todayStr } from "@/lib/date";
 import type { CourseWithDetails, SessionUser } from "@/lib/types";
 
 // GET /api/boot — single round trip for app startup.
@@ -28,10 +29,9 @@ export async function GET() {
       return json({ user, courses: [] });
     }
 
-    // Staff: active-check, course fetch and the unique headcount are all
-    // independent (the course filter only needs the id from the signed token),
-    // so run them in parallel.
-    const [professor, courses, uniqueStudents] = await Promise.all([
+    const today = todayStr();
+    // Staff: active-check, course fetch, headcount, and today's attendance run in parallel.
+    const [professor, courses, uniqueStudents, todayCounts] = await Promise.all([
       db.professor.findUnique({
         where: { id: payload.sub },
         select: { id: true, name: true, username: true, role: true, active: true },
@@ -56,6 +56,14 @@ export async function GET() {
               },
             },
           }),
+      db.attendanceRecord.groupBy({
+        by: ["courseId", "status"],
+        where: {
+          date: today,
+          ...(payload.role === "ADMIN" ? {} : { course: { professorId: payload.sub } }),
+        },
+        _count: { _all: true },
+      }),
     ]);
 
     if (!professor || !professor.active) return json({ user: null, courses: [] });
@@ -67,16 +75,29 @@ export async function GET() {
       role: professor.role === "ADMIN" ? "ADMIN" : "PROFESSOR",
     };
 
-    const courseList: CourseWithDetails[] = courses.map((c) => ({
-      id: c.id,
-      code: c.code,
-      title: c.title,
-      programId: c.programId,
-      programName: c.program.name,
-      professorId: c.professorId,
-      professorName: c.professor.name,
-      studentCount: c._count.enrollments,
-    }));
+    const todaySummary = new Map<string, { marked: number; present: number }>();
+    for (const row of todayCounts) {
+      const curr = todaySummary.get(row.courseId) ?? { marked: 0, present: 0 };
+      curr.marked += row._count._all;
+      if (row.status === "PRESENT") curr.present += row._count._all;
+      todaySummary.set(row.courseId, curr);
+    }
+
+    const courseList: CourseWithDetails[] = courses.map((c) => {
+      const t = todaySummary.get(c.id);
+      return {
+        id: c.id,
+        code: c.code,
+        title: c.title,
+        programId: c.programId,
+        programName: c.program.name,
+        professorId: c.professorId,
+        professorName: c.professor.name,
+        studentCount: c._count.enrollments,
+        todayMarkedCount: t?.marked ?? 0,
+        todayPresentCount: t?.present ?? 0,
+      };
+    });
 
     return json({ user, courses: courseList, stats: { students: uniqueStudents } });
   } catch (e) {

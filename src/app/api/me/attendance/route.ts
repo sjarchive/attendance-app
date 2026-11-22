@@ -1,7 +1,12 @@
 import { db } from "@/lib/db";
 import { requireUser, isErrorResponse } from "@/lib/auth";
 import { json, serverError } from "@/lib/api";
-import type { MyAttendanceResponse, StudentCourseSummary } from "@/lib/types";
+import type {
+  AttendanceStatus,
+  MyAttendanceResponse,
+  StudentAttendanceHistoryItem,
+  StudentCourseSummary,
+} from "@/lib/types";
 
 // GET /api/me/attendance — read-only view of the signed-in student's own
 // attendance across every course they were ever enrolled in (Phase 2).
@@ -39,6 +44,7 @@ export async function GET() {
         LATE: number;
         LEAVE: number;
         last: string | null;
+        history: StudentAttendanceHistoryItem[];
       }
     >();
     let totalMarked = 0;
@@ -51,6 +57,7 @@ export async function GET() {
         LATE: 0,
         LEAVE: 0,
         last: null as string | null,
+        history: [] as StudentAttendanceHistoryItem[],
       };
       if (
         r.status === "PRESENT" ||
@@ -59,6 +66,7 @@ export async function GET() {
         r.status === "LEAVE"
       ) {
         s[r.status] += 1;
+        s.history.push({ date: r.date, status: r.status as AttendanceStatus });
       }
       if (s.last === null || r.date > s.last) s.last = r.date;
       byCourse.set(r.courseId, s);
@@ -73,6 +81,7 @@ export async function GET() {
         LATE: 0,
         LEAVE: 0,
         last: null,
+        history: [],
       };
       const marked = s.PRESENT + s.ABSENT + s.LATE + s.LEAVE;
       return {
@@ -87,6 +96,7 @@ export async function GET() {
         leave: s.LEAVE,
         percentage: marked === 0 ? 0 : Math.round((s.PRESENT / marked) * 1000) / 10,
         lastMarked: s.last,
+        history: s.history,
       };
     });
 

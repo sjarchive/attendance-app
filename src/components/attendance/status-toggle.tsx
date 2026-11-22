@@ -17,17 +17,28 @@ interface StatusToggleProps {
   value: AttendanceStatus | null;
   onChange: (status: AttendanceStatus) => void;
   disabled?: boolean;
+  studentName?: string;
 }
 
-// Per-student Present / Absent / Late / Leave control (plan Step 5).
+// Per-student Present / Absent / Late / Leave control.
 // Clicking the already-selected status clears it (un-mark).
-export function StatusToggle({ value, onChange, disabled }: StatusToggleProps) {
+// Mobile targets are 40x40px with comfortable spacing to prevent mis-taps.
+export function StatusToggle({
+  value,
+  onChange,
+  disabled,
+  studentName,
+}: StatusToggleProps) {
   return (
     <TooltipProvider delayDuration={200}>
       <div
-        className="flex items-center gap-1"
+        className="flex items-center gap-1.5 sm:gap-1"
         role="group"
-        aria-label="Attendance status"
+        aria-label={
+          studentName
+            ? `Attendance status for ${studentName}`
+            : "Attendance status"
+        }
       >
         {ATTENDANCE_STATUSES.map((status) => {
           const meta = STATUS_META[status];
@@ -39,19 +50,26 @@ export function StatusToggle({ value, onChange, disabled }: StatusToggleProps) {
                   type="button"
                   disabled={disabled}
                   aria-pressed={selected}
-                  aria-label={meta.label}
-                  onClick={() => onChange(status)}
+                  aria-label={
+                    studentName ? `${meta.label} — ${studentName}` : meta.label
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChange(status);
+                  }}
                   className={cn(
-                    "h-8 w-8 rounded-md border text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-10",
+                    "h-10 w-10 rounded-md border text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-10",
                     selected
                       ? meta.className
-                      : "border-border bg-muted/40 text-muted-foreground hover:bg-muted"
+                      : "border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground dark:bg-muted/30"
                   )}
                 >
                   {meta.short}
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top">{meta.label}</TooltipContent>
+              <TooltipContent side="top">
+                {meta.label} ({meta.short})
+              </TooltipContent>
             </Tooltip>
           );
         })}

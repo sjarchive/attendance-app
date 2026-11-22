@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiFetch } from "@/lib/client";
-import { formatDateLabel } from "@/lib/date";
+import { formatLocalAuditTime } from "@/lib/attendance-helpers";
 import type { AuditEntry, AuditEntityType, AuditResponse } from "@/lib/types";
 
 const ACTION_LABELS: Record<string, string> = {
@@ -120,17 +120,6 @@ function parseAuditDetails(raw: string | null): AuditParsedDetails | null {
   }
 }
 
-// createdAt is an ISO string; the date part is formatted with the shared
-// helper and the time is shown as-is (kept simple by design).
-function formatAuditTimestamp(iso: string): string {
-  const datePart = iso.slice(0, 10);
-  const timePart = iso.slice(11, 16);
-  if (!datePart) return iso;
-  return timePart
-    ? `${formatDateLabel(datePart)}, ${timePart}`
-    : formatDateLabel(datePart);
-}
-
 function AuditRow({ entry }: { entry: AuditEntry }) {
   const Icon = ENTITY_ICONS[entry.entityType];
   const details = parseAuditDetails(entry.details);
@@ -140,10 +129,11 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
   const created = details?.created ?? 0;
   const hasExtras =
     visible.length > 0 || changedMore > 0 || created > 0;
+  const time = formatLocalAuditTime(entry.createdAt);
 
   return (
     <div className="flex items-start gap-3 py-3">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-400">
         <Icon className="h-4 w-4" aria-hidden="true" />
       </div>
       <div className="min-w-0 flex-1">
@@ -156,7 +146,14 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
           </span>
         </div>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          {entry.actorName} · {formatAuditTimestamp(entry.createdAt)}
+          {entry.actorName} ·{" "}
+          <time
+            dateTime={entry.createdAt}
+            title={time.exact}
+            className="cursor-help underline decoration-dotted decoration-muted-foreground/50 underline-offset-2"
+          >
+            {time.relative}
+          </time>
         </p>
         {hasExtras && (
           <div className="mt-1.5 space-y-0.5">
