@@ -1,19 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 
-const appSans = Plus_Jakarta_Sans({
+const appSans = Geist({
   variable: "--font-app-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
 });
 
-const appMono = JetBrains_Mono({
+const appMono = Geist_Mono({
   variable: "--font-app-mono",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
