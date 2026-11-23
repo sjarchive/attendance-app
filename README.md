@@ -5,9 +5,6 @@ attendance per course, manage rosters, and review reports with CSV export. An AD
 (HoD) manages professor accounts, programs and courses. Students get a read-only view
 of their own attendance history.
 
-**Live demo**: https://attendance.nvy.workers.dev (auto-deployed from `main`
-via Cloudflare Workers Builds)
-
 ## Features
 
 - Role-based access: ADMIN, PROFESSOR, STUDENT (read-only self-view)
@@ -105,7 +102,7 @@ Builds — no API tokens or secrets are stored in GitHub or locally:
 
 - **Push to `main`** → build (`npm ci && npx prisma generate && npx
   opennextjs-cloudflare build && node scripts/patch-opennext-cookie.mjs`) →
-  `npx wrangler deploy` → https://attendance.nvy.workers.dev
+  `npx wrangler deploy`
 - **Push to any other branch / open a PR** → preview build deployed with
   `npx wrangler preview` (unique preview URL, production untouched)
 - Build caching is enabled; build logs are in the Cloudflare dashboard
