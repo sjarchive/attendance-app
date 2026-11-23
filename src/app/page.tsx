@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { LoginScreen } from "@/components/attendance/login-screen";
 import { Dashboard } from "@/components/attendance/dashboard";
@@ -434,14 +435,25 @@ export default function Home() {
             <div className="hidden text-right md:block">
               <p className="text-xs font-medium leading-tight">{user.name}</p>
               <p className="text-[11px] leading-tight text-muted-foreground">
-                {user.role === "ADMIN"
-                  ? "Admin"
-                  : user.role === "PROFESSOR"
-                    ? "Professor"
-                    : "Student"}{" "}
-                · {user.username}
+                {user.username}
               </p>
             </div>
+            <Badge
+              variant="outline"
+              className={
+                isAdmin
+                  ? "border-violet-200 bg-violet-50 text-[10px] font-semibold text-violet-700 dark:border-violet-800/60 dark:bg-violet-950/50 dark:text-violet-300"
+                  : isStudent
+                    ? "border-emerald-200 bg-emerald-50 text-[10px] font-semibold text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/50 dark:text-emerald-300"
+                    : "border-border bg-muted/60 text-[10px] font-semibold text-muted-foreground"
+              }
+            >
+              {user.role === "ADMIN"
+                ? "Admin"
+                : user.role === "PROFESSOR"
+                  ? "Professor"
+                  : "Student"}
+            </Badge>
             <Button
               variant="ghost"
               size="icon"
