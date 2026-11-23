@@ -36,8 +36,8 @@ const DEMO_ACCOUNTS = [
   { label: "Professor", username: "rajesh", password: "prof123" },
   {
     label: "Student (read-only)",
-    username: "bed1-01",
-    password: "BED1-01",
+    username: "bed-01",
+    password: "BED-01",
   },
 ];
 

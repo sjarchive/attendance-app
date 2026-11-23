@@ -1,4 +1,4 @@
-// Seed: one ADMIN user, demo professors, all four programs, sample
+// Seed: one ADMIN user, demo professors, all three programs, sample
 // courses/students (plan Step 2) + a day of demo attendance so the
 // "re-open a past date" flow can be tried immediately.
 import { PrismaClient } from "@prisma/client";
@@ -51,29 +51,26 @@ async function main() {
   });
 
   const programs = await Promise.all(
-    ["B.Ed I Year", "B.Ed II Year", "Integrated BA-B.Ed", "B.Sc-B.Ed"].map((name) =>
+    ["B.Ed.", "B.A. B.Ed.", "B.Sc. B.Ed"].map((name) =>
       prisma.program.create({ data: { name } })
     )
   );
 
-  const [bed1, bed2, ibe, sbe] = programs;
+  const [bed, babed, bscbed] = programs;
 
   const courseDefs = [
-    { program: bed1, code: "EDU-101", title: "Childhood and Growing Up", professor: meera },
-    { program: bed1, code: "EDU-102", title: "Contemporary India and Education", professor: rajesh },
-    { program: bed2, code: "EDU-201", title: "Assessment for Learning", professor: meera },
-    { program: bed2, code: "EDU-202", title: "Inclusive Education", professor: rajesh },
-    { program: ibe, code: "IBE-101", title: "Educational Psychology", professor: meera },
-    { program: ibe, code: "IBE-102", title: "Philosophy of Education", professor: rajesh },
-    { program: sbe, code: "SBE-101", title: "Pedagogy of Physical Science", professor: meera },
-    { program: sbe, code: "SBE-102", title: "Pedagogy of Mathematics", professor: rajesh },
+    { program: bed, code: "BED-101", title: "Childhood and Growing Up", professor: meera },
+    { program: bed, code: "BED-102", title: "Contemporary India and Education", professor: rajesh },
+    { program: babed, code: "BABED-101", title: "Educational Psychology", professor: meera },
+    { program: babed, code: "BABED-102", title: "Philosophy of Education", professor: rajesh },
+    { program: bscbed, code: "BSCBED-101", title: "Pedagogy of Physical Science", professor: meera },
+    { program: bscbed, code: "BSCBED-102", title: "Pedagogy of Mathematics", professor: rajesh },
   ];
 
   const rollPrefix: Record<string, string> = {
-    [bed1.id]: "BED1",
-    [bed2.id]: "BED2",
-    [ibe.id]: "IBE",
-    [sbe.id]: "SBE",
+    [bed.id]: "BED",
+    [babed.id]: "BABED",
+    [bscbed.id]: "BSCBED",
   };
 
   for (const p of programs) {
@@ -156,7 +153,7 @@ async function main() {
         entityType: "course",
         entityId: demoCourse.id,
         entityLabel: `${demoCourse.code} · ${demoCourse.title}`,
-        details: JSON.stringify({ programName: bed1.name }),
+        details: JSON.stringify({ programName: bed.name }),
         actorId: meera.id,
         actorName: meera.name,
         courseId: demoCourse.id,
@@ -181,7 +178,7 @@ async function main() {
   console.log("Admin:    admin / admin123");
   console.log("Professor: meera / prof123");
   console.log("Professor: rajesh / prof123");
-  console.log("Student (read-only): bed1-01 / BED1-01  (username = roll number lowercase, password = roll number)");
+  console.log("Student (read-only): bed-01 / BED-01  (username = roll number lowercase, password = roll number)");
 }
 
 main()

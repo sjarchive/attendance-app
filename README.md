@@ -71,7 +71,7 @@ Cloudflare D1 (SQLite) — no local Postgres needed.
 | ADMIN (HoD) | `admin` | `admin123` |
 | Professor | `meera` | `prof123` |
 | Professor | `rajesh` | `prof123` |
-| Student (read-only) | `bed1-01` | `BED1-01` |
+| Student (read-only) | `bed-01` | `BED-01` |
 
 Student accounts are optional and created by an admin (username = their roll
 number in lowercase, initial password = roll number). Rotate or remove all demo accounts before real use.

@@ -25,9 +25,9 @@ interface CsvImportDialogProps {
 }
 
 const SAMPLE_CSV = `Roll No,Name
-BED1-12,Ravi Kumar
-BED1-13,Priya Nair
-BED1-14,Ananya Verma
+BED-12,Ravi Kumar
+BED-13,Priya Nair
+BED-14,Ananya Verma
 `;
 
 /** Small numbered stat block used in the import results panel. */
@@ -227,7 +227,7 @@ export function CsvImportDialog({ courseId, onImported }: CsvImportDialogProps) 
                   setCsv(e.target.value);
                   setResult(null);
                 }}
-                placeholder={"BED1-12, Ravi Kumar\nBED1-13, Priya Nair"}
+                placeholder={"BED-12, Ravi Kumar\nBED-13, Priya Nair"}
                 rows={5}
                 className="font-mono text-xs"
                 disabled={pending}
