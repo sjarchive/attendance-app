@@ -5,7 +5,8 @@ attendance per course, manage rosters, and review reports with CSV export. An AD
 (HoD) manages professor accounts, programs and courses. Students get a read-only view
 of their own attendance history.
 
-**Live demo**: https://deptattend.vercel.app
+**Live demo**: https://attendance.nvy.workers.dev (auto-deployed from `main`
+via Cloudflare Workers Builds)
 
 ## Features
 
@@ -96,6 +97,26 @@ number in lowercase, initial password = roll number). Rotate or remove all demo 
 The primary deployment target. Uses the [OpenNext Cloudflare adapter]
 (https://opennext.js.org/cloudflare) (`@opennextjs/cloudflare`) and Prisma's
 D1 driver adapter (`@prisma/adapter-d1`) against a D1 SQLite database.
+
+### CI/CD: Cloudflare Workers Builds (active)
+
+The repo is connected to the `attendance` Worker through Cloudflare Workers
+Builds — no API tokens or secrets are stored in GitHub or locally:
+
+- **Push to `main`** → build (`npm ci && npx prisma generate && npx
+  opennextjs-cloudflare build && node scripts/patch-opennext-cookie.mjs`) →
+  `npx wrangler deploy` → https://attendance.nvy.workers.dev
+- **Push to any other branch / open a PR** → preview build deployed with
+  `npx wrangler preview` (unique preview URL, production untouched)
+- Build caching is enabled; build logs are in the Cloudflare dashboard
+  (Worker → Settings → Builds → View build)
+
+The `name` in `wrangler.jsonc` must match the connected Worker (`attendance`)
+or the build fails.
+
+### Manual deploy (optional)
+
+To deploy by hand instead of relying on CI:
 
 1. Log in / provide credentials:
 

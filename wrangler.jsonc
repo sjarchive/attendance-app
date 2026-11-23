@@ -1,7 +1,7 @@
 {
   // Cloudflare Workers deployment (OpenNext adapter). See open-next.config.ts.
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "attendance-app",
+  "name": "attendance",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["nodejs_compat"],
