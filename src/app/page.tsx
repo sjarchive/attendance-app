@@ -537,9 +537,12 @@ export default function Home() {
         className="mt-auto border-t"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-4 py-3">
           <p className="text-xs text-muted-foreground">
             Department of Education
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Session 2026-27
           </p>
         </div>
       </footer>
