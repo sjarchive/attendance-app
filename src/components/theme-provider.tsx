@@ -20,8 +20,7 @@ interface ThemeContextValue {
 }
 
 const STORAGE_KEY = "theme";
-const TRANSITION_CLASS = "theme-transition";
-const TRANSITION_MS = 320;
+const SWITCHING_CLASS = "theme-switching";
 
 const ThemeContext = createContext<ThemeContextValue>({
   theme: "light",
@@ -56,7 +55,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       : "light";
   });
 
-  const transitionTimerRef = useRef<number | null>(null);
+  const transitionIdRef = useRef(0);
 
   useEffect(() => {
     applyThemeToDom(theme);
@@ -74,9 +73,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener("storage", onStorage);
-      if (transitionTimerRef.current !== null) {
-        window.clearTimeout(transitionTimerRef.current);
-      }
+      document.documentElement.classList.remove(SWITCHING_CLASS);
     };
   }, []);
 
@@ -87,44 +84,55 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       // ignore storage errors
     }
 
-    const prefersReducedMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-
-    if (prefersReducedMotion || typeof document === "undefined") {
-      applyThemeToDom(next);
+    if (typeof document === "undefined") {
       setThemeState(next);
       return;
     }
 
+    const root = document.documentElement;
+    transitionIdRef.current += 1;
+    const transitionId = transitionIdRef.current;
+
+    const cleanup = () => {
+      if (transitionIdRef.current === transitionId) {
+        root.classList.remove(SWITCHING_CLASS);
+      }
+    };
+
+    // Freeze all per-element CSS transitions before mutating theme classes so
+    // every element snaps to its new theme together instead of lagging individually.
+    root.classList.add(SWITCHING_CLASS);
+    void root.offsetHeight;
+
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
     const doc = document as DocumentWithViewTransition;
-    if (typeof doc.startViewTransition === "function") {
+    if (!prefersReducedMotion && typeof doc.startViewTransition === "function") {
       try {
         const vt = doc.startViewTransition(() => {
+          applyThemeToDom(next);
           flushSync(() => {
             setThemeState(next);
           });
-          applyThemeToDom(next);
+          void root.offsetHeight;
         });
-        vt?.finished?.catch(() => {});
+        vt.finished.then(cleanup, cleanup);
         return;
       } catch {
-        // Fall through to CSS transition fallback if view transition fails
+        // Fall through to atomic single-frame switch if view transition fails
       }
     }
 
-    const root = document.documentElement;
-    if (transitionTimerRef.current !== null) {
-      window.clearTimeout(transitionTimerRef.current);
-    }
-    root.classList.add(TRANSITION_CLASS);
-    void root.offsetWidth;
     applyThemeToDom(next);
-    setThemeState(next);
-    transitionTimerRef.current = window.setTimeout(() => {
-      root.classList.remove(TRANSITION_CLASS);
-      transitionTimerRef.current = null;
-    }, TRANSITION_MS);
+    flushSync(() => {
+      setThemeState(next);
+    });
+    void root.offsetHeight;
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(cleanup);
+    });
   }, []);
 
   return (
