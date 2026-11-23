@@ -5,9 +5,11 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
+import { flushSync } from "react-dom";
 
 export type Theme = "light" | "dark";
 
@@ -18,6 +20,8 @@ interface ThemeContextValue {
 }
 
 const STORAGE_KEY = "theme";
+const TRANSITION_CLASS = "theme-transition";
+const TRANSITION_MS = 320;
 
 const ThemeContext = createContext<ThemeContextValue>({
   theme: "light",
@@ -31,6 +35,12 @@ function applyThemeToDom(theme: Theme) {
   root.classList.add(theme);
   root.style.colorScheme = theme;
 }
+
+type DocumentWithViewTransition = Document & {
+  startViewTransition?: (updateCallback: () => void) => {
+    finished: Promise<void>;
+  };
+};
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
@@ -46,28 +56,75 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       : "light";
   });
 
+  const transitionTimerRef = useRef<number | null>(null);
+
   useEffect(() => {
     applyThemeToDom(theme);
   }, [theme]);
 
   useEffect(() => {
     function onStorage(e: StorageEvent) {
-      if (e.key === STORAGE_KEY && (e.newValue === "light" || e.newValue === "dark")) {
+      if (
+        e.key === STORAGE_KEY &&
+        (e.newValue === "light" || e.newValue === "dark")
+      ) {
         setThemeState(e.newValue);
       }
     }
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      if (transitionTimerRef.current !== null) {
+        window.clearTimeout(transitionTimerRef.current);
+      }
+    };
   }, []);
 
   const setTheme = useCallback((next: Theme) => {
-    setThemeState(next);
-    applyThemeToDom(next);
     try {
       window.localStorage.setItem(STORAGE_KEY, next);
     } catch {
       // ignore storage errors
     }
+
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+    if (prefersReducedMotion || typeof document === "undefined") {
+      applyThemeToDom(next);
+      setThemeState(next);
+      return;
+    }
+
+    const doc = document as DocumentWithViewTransition;
+    if (typeof doc.startViewTransition === "function") {
+      try {
+        const vt = doc.startViewTransition(() => {
+          flushSync(() => {
+            setThemeState(next);
+          });
+          applyThemeToDom(next);
+        });
+        vt?.finished?.catch(() => {});
+        return;
+      } catch {
+        // Fall through to CSS transition fallback if view transition fails
+      }
+    }
+
+    const root = document.documentElement;
+    if (transitionTimerRef.current !== null) {
+      window.clearTimeout(transitionTimerRef.current);
+    }
+    root.classList.add(TRANSITION_CLASS);
+    void root.offsetWidth;
+    applyThemeToDom(next);
+    setThemeState(next);
+    transitionTimerRef.current = window.setTimeout(() => {
+      root.classList.remove(TRANSITION_CLASS);
+      transitionTimerRef.current = null;
+    }, TRANSITION_MS);
   }, []);
 
   return (
