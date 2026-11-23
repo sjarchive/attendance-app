@@ -354,35 +354,42 @@ export default function Home() {
 
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4">
-          {/* Brand button returns to Dashboard */}
-          {isStudent ? (
-            <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
-              <GraduationCap
-                className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
-                aria-hidden="true"
-              />
-              <span className="text-sm font-semibold tracking-tight">
-                Attendance Tracker
-              </span>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() =>
-                navigateWithGuard(() => commitView({ name: "dashboard" }))
+          {/* Brand button returns to Dashboard or scrolls to top when already on home screen */}
+          <button
+            type="button"
+            onClick={() => {
+              const reducedMotion = window.matchMedia(
+                "(prefers-reduced-motion: reduce)"
+              ).matches;
+              const scrollTop = () =>
+                window.scrollTo({
+                  top: 0,
+                  behavior: reducedMotion ? "auto" : "smooth",
+                });
+              if (isStudent || view.name === "dashboard") {
+                scrollTop();
+              } else {
+                navigateWithGuard(() => {
+                  commitView({ name: "dashboard" });
+                  scrollTop();
+                });
               }
-              className="flex shrink-0 items-center gap-2 rounded-md py-1 pr-1 text-left whitespace-nowrap transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Attendance Tracker — Go to Dashboard"
-            >
-              <GraduationCap
-                className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
-                aria-hidden="true"
-              />
-              <span className="text-sm font-semibold tracking-tight">
-                Attendance Tracker
-              </span>
-            </button>
-          )}
+            }}
+            className="flex shrink-0 items-center gap-2 rounded-md py-1 pr-1 text-left whitespace-nowrap transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={
+              isStudent || view.name === "dashboard"
+                ? "Attendance Tracker — Scroll to top"
+                : "Attendance Tracker — Go to Dashboard"
+            }
+          >
+            <GraduationCap
+              className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
+              aria-hidden="true"
+            />
+            <span className="text-sm font-semibold tracking-tight">
+              Attendance Tracker
+            </span>
+          </button>
 
           <nav
             className="ml-auto flex shrink-0 items-center gap-1 sm:gap-1.5"
