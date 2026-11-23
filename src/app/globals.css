@@ -119,6 +119,26 @@
   body {
     @apply bg-background text-foreground;
   }
+  a[href],
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]):not([data-disabled]),
+  [role="menuitem"]:not([aria-disabled="true"]):not([data-disabled]),
+  [role="option"]:not([aria-disabled="true"]):not([data-disabled]),
+  select:not(:disabled),
+  summary,
+  input[type="button"]:not(:disabled),
+  input[type="submit"]:not(:disabled),
+  input[type="reset"]:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled) {
+    cursor: pointer;
+  }
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  select:disabled {
+    cursor: not-allowed;
+  }
 }
 
 /* Smooth light/dark theme transition (only active during explicit toggle) */
