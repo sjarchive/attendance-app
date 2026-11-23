@@ -64,3 +64,9 @@ server.log
 /db/
 /PROJECT_CONTEXT.mddocs/PROJECT_CONTEXT.md
 scripts/restore.sh
+
+# cloudflare workers / opennext
+.open-next
+.wrangler
+.dev.vars
+.dev.vars*

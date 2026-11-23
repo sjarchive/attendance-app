@@ -1,0 +1,23 @@
+{
+  // Cloudflare Workers deployment (OpenNext adapter). See open-next.config.ts.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "attendance-app",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "attendance-app-db",
+      "database_id": "b06362b3-faba-4b8f-a288-d14895380da2",
+      "migrations_dir": "d1/migrations"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

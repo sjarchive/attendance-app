@@ -24,15 +24,15 @@ of their own attendance history.
 
 - Next.js 16 (App Router) + TypeScript 5
 - Tailwind CSS 4 + shadcn/ui (New York) + Lucide icons
-- Prisma ORM + PostgreSQL (Neon): pooled connection at runtime, direct endpoint for migrations
+- Prisma ORM (D1 driver adapter) + Cloudflare D1 (SQLite) on Cloudflare Workers
 - Auth: HMAC-SHA256 signed session cookie (Web Crypto, Edge-compatible), bcryptjs
   password hashing, login rate limiting
 - zod validation on every API route; single-page UI on the `/` route
 
 ## Getting Started
 
-Prerequisites: [Bun](https://bun.sh) (or Node 20+ with npm) and a PostgreSQL database
-([Neon](https://neon.tech) recommended).
+Prerequisites: [Bun](https://bun.sh) (or Node 20+ with npm). The database is
+Cloudflare D1 (SQLite) — no local Postgres needed.
 
 1. Install dependencies:
 
@@ -40,23 +40,21 @@ Prerequisites: [Bun](https://bun.sh) (or Node 20+ with npm) and a PostgreSQL dat
    bun install
    ```
 
-2. Create `.env` in the project root:
+2. Create `.env` in the project root (only used by Prisma CLI tooling; at
+   runtime the D1 driver adapter + `DB` binding in `wrangler.jsonc` take over):
 
    ```env
-   DATABASE_URL=postgresql://user:pass@ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require
-   DIRECT_URL=postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require
+   DATABASE_URL=file:./prisma/dev.db
    AUTH_SECRET=<random 32-byte hex>
    ```
 
-   - `DATABASE_URL` — pooled connection string (runtime queries)
-   - `DIRECT_URL` — direct connection string (used by Prisma Migrate)
    - `AUTH_SECRET` — signs the session cookie (`openssl rand -hex 32`)
 
-3. Apply migrations and (optionally) seed demo data:
+3. (Optional) local dev with a local D1 database:
 
    ```bash
-   bunx prisma migrate deploy
-   bunx tsx prisma/seed.ts
+   npm run cf:migrate:local   # applies d1/migrations/*.sql to local D1
+   npm run cf:preview         # next dev + local Worker bindings
    ```
 
 4. Start the dev server:
@@ -88,8 +86,70 @@ number in lowercase, initial password = roll number). Rotate or remove all demo 
 | `bunx tsc --noEmit` | Type check |
 | `bunx prisma migrate dev` | Create a migration after schema changes |
 | `bunx prisma migrate deploy` | Apply migrations |
+| `npm run cf:build` | OpenNext build for Cloudflare Workers (+ cookie patch) |
+| `npm run cf:deploy` | Build and deploy to Cloudflare Workers |
+| `npm run cf:migrate:remote` | Apply `d1/migrations/` to the remote D1 database |
+| `npm run cf:migrate:local` | Apply `d1/migrations/` to local D1 (dev) |
 
-## Deploying to Vercel + Neon
+## Deploying to Cloudflare Workers + D1
+
+The primary deployment target. Uses the [OpenNext Cloudflare adapter]
+(https://opennext.js.org/cloudflare) (`@opennextjs/cloudflare`) and Prisma's
+D1 driver adapter (`@prisma/adapter-d1`) against a D1 SQLite database.
+
+1. Log in / provide credentials:
+
+   ```bash
+   export CLOUDFLARE_API_TOKEN=<token with D1 + Workers edit permissions>
+   export CLOUDFLARE_ACCOUNT_ID=<account id>
+   # or: npx wrangler login
+   ```
+
+2. Create the D1 database once and put its id in `wrangler.jsonc`
+   (`d1_databases[].database_id`):
+
+   ```bash
+   npx wrangler d1 create attendance-app-db
+   ```
+
+3. Build, apply migrations and deploy:
+
+   ```bash
+   npm run cf:deploy             # opennext build + cookie patch + wrangler deploy
+   npm run cf:migrate:remote     # applies d1/migrations/*.sql to the remote D1
+   ```
+
+4. Set the session secret once (regenerates a deployment):
+
+   ```bash
+   openssl rand -hex 32 | npx wrangler secret put AUTH_SECRET
+   ```
+
+5. (Optional) seed demo data — `d1/seed.sql` mirrors `prisma/seed.ts`:
+
+   ```bash
+   npx wrangler d1 execute DB --remote --file d1/seed.sql -y
+   ```
+
+6. Sign in as ADMIN and create the real professor accounts in the Admin panel.
+
+Notes:
+- `scripts/patch-opennext-cookie.mjs` works around a known bug in
+  `@opennextjs/cloudflare` 1.20.x where the Next 16 proxy (`proxy.ts`) crashes
+  on any request carrying a Cookie header (bundled `cookie` v1 has no default
+  export). It is wired into `cf:build` / `cf:deploy`; drop it once upstream
+  fixes the ESM interop.
+- Schema changes: edit `prisma/schema.prisma`, then regenerate the migration
+  with `npx prisma migrate diff --from-empty --to-schema-datamodel
+  prisma/schema.prisma --script > d1/migrations/000N_<name>.sql` and run
+  `npm run cf:migrate:remote`.
+
+### Legacy: Vercel + Neon (PostgreSQL)
+
+The original deployment path is kept as documentation. To use it, switch
+`prisma/schema.prisma` back to `provider = "postgresql"` (with `url` +
+`directUrl`) and restore the PostgreSQL-flavored bulk upsert in
+`src/app/api/attendance/route.ts` (the current statement is SQLite/D1-flavored).
 
 1. Create a Neon project and copy both connection strings (pooled + direct).
 2. Create a Vercel project and set the environment variables:
@@ -121,11 +181,14 @@ bun run start   # serves .next/standalone/server.js
 ## Project Structure
 
 ```
-prisma/            schema.prisma, migrations/, seed.ts
+prisma/            schema.prisma (sqlite), migrations/, seed.ts
+d1/                migrations/ (D1 SQL applied by wrangler), seed.sql (demo data)
 src/app/           page.tsx (single-page UI) + api/ route handlers
 src/components/    attendance/ — login, dashboard, marker, roster, reports, admin, audit
-src/lib/           session, db, auth, audit, rate-limit, course-access, csv, date helpers
-src/middleware.ts  session gate for all API routes (except /api/auth/*)
+src/lib/           session, db (D1 driver adapter), auth, audit, rate-limit, course-access, csv, date helpers
+src/proxy.ts       session gate for all API routes (except /api/auth/*)
+wrangler.jsonc     Cloudflare Workers config (D1 binding, assets, nodejs_compat)
+open-next.config.ts  OpenNext Cloudflare adapter config
 ```
 
 ## Security Notes

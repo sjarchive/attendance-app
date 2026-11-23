@@ -141,8 +141,11 @@ export async function POST(request: NextRequest) {
     // Bulk upsert in ONE statement: instead of one round trip per student
     // (40 students = 40 queries), a single INSERT ... ON CONFLICT covers the
     // whole roster. This is the dominant cost when the database is remote.
+    // SQLite/D1 flavor: no :: casts, randomblob() ids, epoch-ms timestamps
+    // (Prisma stores SQLite DateTimes as INTEGER epoch milliseconds) and
+    // positional VALUES columns (SQLite can't rename them in the alias).
     const valueRows = validRecords.map((r) =>
-      Prisma.sql`(${r.studentId}::text, ${r.status}::text)`
+      Prisma.sql`(${r.studentId}, ${r.status})`
     );
     const touchedPromise = db.student.findMany({
       where: { id: { in: validRecords.map((r) => r.studentId) } },
@@ -153,12 +156,15 @@ export async function POST(request: NextRequest) {
       db.$executeRaw`
         INSERT INTO "attendance"
           ("id", "courseId", "studentId", "date", "status", "markedById", "createdAt", "updatedAt")
-        SELECT gen_random_uuid()::text, ${courseId}::text, v.student_id, ${date}::text, v.status, ${user.id}::text, now(), now()
-        FROM (VALUES ${Prisma.join(valueRows)}) AS v(student_id, status)
+        SELECT lower(hex(randomblob(16))), ${courseId}, v.column1, ${date}, v.column2, ${user.id},
+               CAST(strftime('%s','now') AS INTEGER) * 1000,
+               CAST(strftime('%s','now') AS INTEGER) * 1000
+        FROM (VALUES ${Prisma.join(valueRows)}) AS v
+        WHERE true -- required by SQLite: disambiguates ON CONFLICT after INSERT ... SELECT
         ON CONFLICT ("courseId", "studentId", "date")
         DO UPDATE SET "status" = EXCLUDED."status",
                       "markedById" = EXCLUDED."markedById",
-                      "updatedAt" = now()
+                      "updatedAt" = CAST(strftime('%s','now') AS INTEGER) * 1000
       `,
     ]);
 

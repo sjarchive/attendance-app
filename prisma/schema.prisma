@@ -1,16 +1,18 @@
 // Student Attendance Tracking — data model (plan Section 2)
-// Production: PostgreSQL on Neon. DATABASE_URL uses the pooled connection
-// string (serverless-friendly); DIRECT_URL (direct endpoint) is used by
-// prisma migrate/db push. Role/status are validated String fields.
+// Production: Cloudflare D1 (SQLite) accessed through the Prisma D1 driver
+// adapter (@prisma/adapter-d1) + the DB binding in wrangler.jsonc.
+// Role/status are validated String fields (SQLite has no enums).
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "sqlite"
+  // Only used by CLI tooling (migrate diff / db push); at runtime the D1
+  // driver adapter + DB binding take over, so this never points anywhere.
+  url = env("DATABASE_URL")
 }
 
 model Professor {
