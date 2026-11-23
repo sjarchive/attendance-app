@@ -30,13 +30,17 @@ export async function GET(request: NextRequest) {
       orderBy: { student: { rollNo: "asc" } },
     });
 
-    const students: RosterStudent[] = enrollments.map((e) => ({
-      studentId: e.studentId,
-      rollNo: e.student.rollNo,
-      name: e.student.name,
-      active: e.active,
-      markedDays: e.student._count.attendance,
-    }));
+    const students: RosterStudent[] = enrollments
+      .map((e) => ({
+        studentId: e.studentId,
+        rollNo: e.student.rollNo,
+        name: e.student.name,
+        active: e.active,
+        markedDays: e.student._count.attendance,
+      }))
+      .sort((a, b) =>
+        a.rollNo.localeCompare(b.rollNo, undefined, { numeric: true })
+      );
     return json({ students });
   } catch (e) {
     console.error(e);
@@ -96,6 +100,9 @@ export async function POST(request: NextRequest) {
     });
     const isNewEnrollment = !priorEnrollment;
     const wasInactive = priorEnrollment ? !priorEnrollment.active : false;
+    if (priorEnrollment && priorEnrollment.active && !nameCorrected) {
+      return conflict(`Roll number ${rollNo} is already on this course roster`);
+    }
 
     const enrollment = await db.enrollment.upsert({
       where: { courseId_studentId: { courseId, studentId: student.id } },

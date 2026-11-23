@@ -9,7 +9,7 @@ import {
   ShieldCheck,
   Sun,
 } from "lucide-react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/theme-provider";
 import { toast } from "sonner";
 import {
   AlertDialog,

@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireUser, isErrorResponse } from "@/lib/auth";
-import { json, badRequest, serverError } from "@/lib/api";
+import { json, badRequest, forbidden, serverError } from "@/lib/api";
 import type { AuditEntry, AuditEntityType, AuditResponse } from "@/lib/types";
 
 const ENTITY_TYPES: AuditEntityType[] = [
@@ -67,10 +67,10 @@ export async function GET(request: NextRequest) {
         where: { professorId: user.id },
         select: { id: true },
       });
-      const ids =
-        courseIdParam && myCourses.some((c) => c.id === courseIdParam)
-          ? [courseIdParam]
-          : myCourses.map((c) => c.id);
+      if (courseIdParam && !myCourses.some((c) => c.id === courseIdParam)) {
+        return forbidden("You do not have access to this course");
+      }
+      const ids = courseIdParam ? [courseIdParam] : myCourses.map((c) => c.id);
       where.entityType = "attendance";
       where.courseId = { in: ids };
     }

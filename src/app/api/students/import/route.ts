@@ -13,10 +13,6 @@ const importSchema = z.object({
   csv: z.string().min(1, "CSV content is empty").max(200_000, "CSV is too large"),
 });
 
-// POST /api/students/import — bulk-add a roster from CSV (Phase 2).
-// Two columns per line: roll number, name. Header row optional.
-// Existing students in the program are (re)enrolled; soft-removed
-// enrollments are re-activated; names are corrected if they differ.
 export async function POST(request: NextRequest) {
   const auth = await requireUser();
   if (isErrorResponse(auth)) return auth.response;
@@ -28,7 +24,6 @@ export async function POST(request: NextRequest) {
   } catch {
     return badRequest("Invalid request body");
   }
-
   const parsed = importSchema.safeParse(body);
   if (!parsed.success) {
     return badRequest(parsed.error.issues[0]?.message ?? "Invalid input");
@@ -40,7 +35,6 @@ export async function POST(request: NextRequest) {
   const { course } = access;
 
   const { rows, errors } = parseRosterCsv(parsed.data.csv);
-
   const summary: ImportSummary = {
     totalRows: rows.length,
     created: 0,
@@ -62,32 +56,42 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      let studentCreated = false;
+      let nameUpdated = false;
       if (!student) {
         student = await db.student.create({
           data: { rollNo: row.rollNo, name: row.name, programId: course.programId },
         });
+        studentCreated = true;
         summary.created += 1;
       } else if (student.name !== row.name) {
         student = await db.student.update({
           where: { id: student.id },
           data: { name: row.name },
         });
+        nameUpdated = true;
         summary.updated += 1;
       }
 
       const prior = await db.enrollment.findUnique({
         where: { courseId_studentId: { courseId, studentId: student.id } },
       });
+
       if (!prior) {
         await db.enrollment.create({
           data: { courseId, studentId: student.id, active: true },
         });
+        if (!studentCreated && !nameUpdated) {
+          summary.created += 1;
+        }
       } else if (!prior.active) {
         await db.enrollment.update({
           where: { id: prior.id },
           data: { active: true },
         });
         summary.reactivated += 1;
+      } else if (!nameUpdated) {
+        summary.skipped += 1;
       }
     }
 
@@ -101,6 +105,7 @@ export async function POST(request: NextRequest) {
         created: summary.created,
         updated: summary.updated,
         reactivated: summary.reactivated,
+        skipped: summary.skipped,
         parseErrors: errors.length,
       },
       actor: user,

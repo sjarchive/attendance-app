@@ -43,6 +43,7 @@ const ACTION_LABELS: Record<string, string> = {
   CREATE_PROFESSOR: "Account created",
   UPDATE_PROFESSOR: "Account updated",
   SET_STUDENT_CREDENTIALS: "Student credentials set",
+  REVOKE_STUDENT_CREDENTIALS: "Student credentials revoked",
   BULK_ENABLE_STUDENT_LOGINS: "Bulk enabled student logins",
 };
 

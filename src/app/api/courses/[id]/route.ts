@@ -41,6 +41,14 @@ export async function PATCH(
     if (data.programId) {
       const program = await db.program.findUnique({ where: { id: data.programId } });
       if (!program) return badRequest("Selected program does not exist");
+      if (data.programId !== course.programId) {
+        const enrollmentCount = await db.enrollment.count({ where: { courseId: id } });
+        if (enrollmentCount > 0) {
+          return conflict(
+            "Cannot change program while students are enrolled in this course"
+          );
+        }
+      }
     }
     if (data.professorId) {
       const professor = await db.professor.findUnique({ where: { id: data.professorId } });

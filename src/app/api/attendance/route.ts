@@ -13,8 +13,6 @@ import type { AttendanceLoadResponse, RosterStudent } from "@/lib/types";
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // GET /api/attendance?courseId=...&date=YYYY-MM-DD
-// Loads the roster + any existing records for that course/date, so re-opening
-// a past date loads existing records for editing (plan Step 5).
 export async function GET(request: NextRequest) {
   const auth = await requireUser();
   if (isErrorResponse(auth)) return auth.response;
@@ -36,16 +34,23 @@ export async function GET(request: NextRequest) {
         include: { student: true },
         orderBy: { student: { rollNo: "asc" } },
       }),
-      db.attendanceRecord.findMany({ where: { courseId, date } }),
+      db.attendanceRecord.findMany({
+        where: { courseId, date },
+        select: { studentId: true, status: true },
+      }),
     ]);
 
-    const roster: RosterStudent[] = enrollments.map((e) => ({
-      studentId: e.studentId,
-      rollNo: e.student.rollNo,
-      name: e.student.name,
-      active: e.active,
-      markedDays: 0,
-    }));
+    const roster: RosterStudent[] = enrollments
+      .map((e) => ({
+        studentId: e.studentId,
+        rollNo: e.student.rollNo,
+        name: e.student.name,
+        active: e.active,
+        markedDays: 0,
+      }))
+      .sort((a, b) =>
+        a.rollNo.localeCompare(b.rollNo, undefined, { numeric: true })
+      );
 
     const recordMap: Record<string, (typeof ATTENDANCE_STATUSES)[number]> = {};
     for (const r of records) {
@@ -59,7 +64,7 @@ export async function GET(request: NextRequest) {
         id: course.id,
         code: course.code,
         title: course.title,
-        programName: "", // filled by caller from courses list; kept simple
+        programName: course.program.name,
       },
       date,
       roster,
@@ -72,22 +77,26 @@ export async function GET(request: NextRequest) {
   }
 }
 
-const saveSchema = z.object({
-  courseId: z.string().min(1),
-  date: z.string().regex(DATE_RE, "date must be YYYY-MM-DD"),
-  records: z
-    .array(
-      z.object({
-        studentId: z.string().min(1),
-        status: z.enum(["PRESENT", "ABSENT", "LATE", "LEAVE"]),
-      })
-    )
-    .min(1, "Nothing to save — mark at least one student"),
-});
+const saveSchema = z
+  .object({
+    courseId: z.string().min(1),
+    date: z.string().regex(DATE_RE, "date must be YYYY-MM-DD"),
+    records: z
+      .array(
+        z.object({
+          studentId: z.string().min(1),
+          status: z.enum(["PRESENT", "ABSENT", "LATE", "LEAVE"]),
+        })
+      )
+      .default([]),
+    clearedStudentIds: z.array(z.string().min(1)).optional().default([]),
+  })
+  .refine(
+    (data) => data.records.length > 0 || data.clearedStudentIds.length > 0,
+    { message: "Nothing to save — mark or clear at least one student" }
+  );
 
-// POST /api/attendance — save (upsert) one row per student.
-// The (courseId, studentId, date) unique constraint makes saving idempotent
-// and re-editable (plan Step 5).
+// POST /api/attendance — upsert marked students and delete cleared students.
 export async function POST(request: NextRequest) {
   const auth = await requireUser();
   if (isErrorResponse(auth)) return auth.response;
@@ -99,14 +108,12 @@ export async function POST(request: NextRequest) {
   } catch {
     return badRequest("Invalid request body");
   }
-
   const parsed = saveSchema.safeParse(body);
   if (!parsed.success) {
     return badRequest(parsed.error.issues[0]?.message ?? "Invalid input");
   }
-  const { courseId, date, records } = parsed.data;
+  const { courseId, date, records, clearedStudentIds } = parsed.data;
 
-  // Block future dates (plan Step 5) — "today" in the department's timezone
   const today = todayStr();
   if (date > today) {
     return badRequest("Attendance cannot be marked for a future date");
@@ -117,9 +124,6 @@ export async function POST(request: NextRequest) {
   const { course } = access;
 
   try {
-    // Only students actively enrolled in this course can be marked; the
-    // existing-record snapshot feeds the audit diff. Independent reads ->
-    // run them in parallel.
     const [activeEnrollments, existingRows] = await Promise.all([
       db.enrollment.findMany({
         where: { courseId, active: true },
@@ -130,48 +134,75 @@ export async function POST(request: NextRequest) {
         select: { studentId: true, status: true },
       }),
     ]);
+
     const activeIds = new Set(activeEnrollments.map((e) => e.studentId));
     const validRecords = records.filter((r) => activeIds.has(r.studentId));
+    const markedIdSet = new Set(validRecords.map((r) => r.studentId));
+    const validClearedIds = Array.from(
+      new Set(
+        clearedStudentIds.filter(
+          (id) => activeIds.has(id) && !markedIdSet.has(id)
+        )
+      )
+    );
 
-    if (validRecords.length === 0) {
+    if (validRecords.length === 0 && validClearedIds.length === 0) {
       return badRequest("No active students in the submitted list");
     }
-    const existingMap = new Map(existingRows.map((r) => [r.studentId, r.status]));
 
-    // Bulk upsert in ONE statement: instead of one round trip per student
-    // (40 students = 40 queries), a single INSERT ... ON CONFLICT covers the
-    // whole roster. This is the dominant cost when the database is remote.
-    // SQLite/D1 flavor: no :: casts, randomblob() ids, epoch-ms timestamps
-    // (Prisma stores SQLite DateTimes as INTEGER epoch milliseconds) and
-    // positional VALUES columns (SQLite can't rename them in the alias).
-    const valueRows = validRecords.map((r) =>
-      Prisma.sql`(${r.studentId}, ${r.status})`
+    const existingMap = new Map(existingRows.map((r) => [r.studentId, r.status]));
+    const touchedIds = Array.from(
+      new Set([...validRecords.map((r) => r.studentId), ...validClearedIds])
     );
+
     const touchedPromise = db.student.findMany({
-      where: { id: { in: validRecords.map((r) => r.studentId) } },
+      where: { id: { in: touchedIds } },
       select: { id: true, rollNo: true, name: true },
     });
-    const [touched] = await Promise.all([
-      touchedPromise,
-      db.$executeRaw`
-        INSERT INTO "attendance"
-          ("id", "courseId", "studentId", "date", "status", "markedById", "createdAt", "updatedAt")
-        SELECT lower(hex(randomblob(16))), ${courseId}, v.column1, ${date}, v.column2, ${user.id},
-               CAST(strftime('%s','now') AS INTEGER) * 1000,
-               CAST(strftime('%s','now') AS INTEGER) * 1000
-        FROM (VALUES ${Prisma.join(valueRows)}) AS v
-        WHERE true -- required by SQLite: disambiguates ON CONFLICT after INSERT ... SELECT
-        ON CONFLICT ("courseId", "studentId", "date")
-        DO UPDATE SET "status" = EXCLUDED."status",
-                      "markedById" = EXCLUDED."markedById",
-                      "updatedAt" = CAST(strftime('%s','now') AS INTEGER) * 1000
-      `,
-    ]);
 
-    // Audit trail: who saved, what changed (Phase 2)
+    // Store DateTime columns as ISO-8601 TEXT matching @prisma/adapter-d1 format
+    const nowIso = new Date().toISOString();
+    const mutations: Promise<unknown>[] = [];
+
+    if (validRecords.length > 0) {
+      const valueRows = validRecords.map((r) =>
+        Prisma.sql`(${r.studentId}, ${r.status})`
+      );
+      mutations.push(
+        db.$executeRaw`
+          INSERT INTO "attendance"
+            ("id", "courseId", "studentId", "date", "status", "markedById", "createdAt", "updatedAt")
+          SELECT lower(hex(randomblob(16))), ${courseId}, v.column1, ${date}, v.column2, ${user.id},
+                 ${nowIso}, ${nowIso}
+          FROM (VALUES ${Prisma.join(valueRows)}) AS v
+          WHERE true
+          ON CONFLICT ("courseId", "studentId", "date")
+          DO UPDATE SET "status" = EXCLUDED."status",
+                        "markedById" = EXCLUDED."markedById",
+                        "updatedAt" = ${nowIso}
+        `
+      );
+    }
+
+    if (validClearedIds.length > 0) {
+      mutations.push(
+        db.attendanceRecord.deleteMany({
+          where: {
+            courseId,
+            date,
+            studentId: { in: validClearedIds },
+          },
+        })
+      );
+    }
+
+    const [touched] = await Promise.all([touchedPromise, ...mutations]);
+
     const studentById = new Map(touched.map((s) => [s.id, s]));
     let createdCount = 0;
+    let clearedCount = 0;
     const changed: { rollNo: string; name: string; from: string; to: string }[] = [];
+
     for (const r of validRecords) {
       const prior = existingMap.get(r.studentId);
       if (prior === undefined) {
@@ -186,6 +217,21 @@ export async function POST(request: NextRequest) {
         });
       }
     }
+
+    for (const studentId of validClearedIds) {
+      const prior = existingMap.get(studentId);
+      if (prior !== undefined) {
+        clearedCount += 1;
+        const s = studentById.get(studentId);
+        changed.push({
+          rollNo: s?.rollNo ?? "?",
+          name: s?.name ?? "?",
+          from: prior,
+          to: "UNMARKED",
+        });
+      }
+    }
+
     await logAudit({
       action: "SAVE_ATTENDANCE",
       entityType: "attendance",
@@ -194,10 +240,11 @@ export async function POST(request: NextRequest) {
       details: {
         date,
         created: createdCount,
+        cleared: clearedCount,
         changed: changed.slice(0, 30),
         changedMore: Math.max(0, changed.length - 30),
         unchanged:
-          validRecords.length - createdCount - changed.length,
+          validRecords.length - createdCount - (changed.length - clearedCount),
       },
       actor: user,
       courseId,
@@ -206,6 +253,7 @@ export async function POST(request: NextRequest) {
     return json({
       ok: true,
       saved: validRecords.length,
+      cleared: clearedCount,
       date,
       courseCode: course.code,
       timezone: APP_TIMEZONE,

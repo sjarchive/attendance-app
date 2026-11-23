@@ -278,20 +278,38 @@ export function AttendanceMarker({
       .filter((r): r is { studentId: string; status: AttendanceStatus } =>
         Boolean(r.status)
       );
-
-    if (records.length === 0) {
+    const clearedStudentIds = roster
+      .filter((s) => Boolean(saved[s.studentId]) && !statuses[s.studentId])
+      .map((s) => s.studentId);
+    if (records.length === 0 && clearedStudentIds.length === 0) {
       toast.error("Nothing to save — mark at least one student first");
       return;
     }
-
     setSaving(true);
     try {
-      const result = await apiFetch<{ saved: number }>("/api/attendance", {
-        method: "POST",
-        body: JSON.stringify({ courseId: course.id, date, records }),
-      });
+      const result = await apiFetch<{ saved: number; cleared?: number }>(
+        "/api/attendance",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            courseId: course.id,
+            date,
+            records,
+            clearedStudentIds,
+          }),
+        }
+      );
+      const summaryParts: string[] = [];
+      if (result.saved > 0) {
+        summaryParts.push(
+          `${result.saved} ${result.saved === 1 ? "student" : "students"}`
+        );
+      }
+      if (result.cleared && result.cleared > 0) {
+        summaryParts.push(`${result.cleared} cleared`);
+      }
       toast.success(
-        `Attendance saved for ${formatDateLabel(date)} (${result.saved} ${result.saved === 1 ? "student" : "students"})`
+        `Attendance saved for ${formatDateLabel(date)}${summaryParts.length > 0 ? ` (${summaryParts.join(", ")})` : ""}`
       );
       await load(course.id, date, true);
       onSaved?.();
@@ -302,7 +320,7 @@ export function AttendanceMarker({
     } finally {
       setSaving(false);
     }
-  }, [roster, statuses, course.id, date, load, onSaved]);
+  }, [roster, statuses, saved, course.id, date, load, onSaved]);
 
   // Ctrl/Cmd + S shortcut to save attendance
   useEffect(() => {

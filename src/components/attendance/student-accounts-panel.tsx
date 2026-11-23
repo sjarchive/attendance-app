@@ -200,20 +200,23 @@ export function StudentAccountsPanel() {
     const rawPass = password;
     setSaving(true);
     try {
-      await apiFetch("/api/student-accounts", {
-        method: "PATCH",
-        body: JSON.stringify({
-          studentId: editing.id,
-          username: trimmedUser,
-          password: rawPass,
-        }),
-      });
+      const res = await apiFetch<{ student: StudentAccountView }>(
+        "/api/student-accounts",
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            studentId: editing.id,
+            username: trimmedUser,
+            password: rawPass,
+          }),
+        }
+      );
       const targetName = editing.name;
       setEditing(null);
       setIssuedCredentials({
         title: "Student credentials saved",
         recipientName: targetName,
-        username: trimmedUser,
+        username: res.student.username ?? trimmedUser.toLowerCase(),
         password: rawPass,
         note: `Share these read-only sign-in details with ${targetName} in person.`,
       });
@@ -553,14 +556,51 @@ export function StudentAccountsPanel() {
             </p>
           </div>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEditing(null)}
-              disabled={saving}
-            >
-              Cancel
-            </Button>
+          <DialogFooter className="gap-2 sm:justify-between">
+            {editing?.hasPassword ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
+                disabled={saving}
+                onClick={async () => {
+                  if (!editing) return;
+                  setSaving(true);
+                  try {
+                    await apiFetch("/api/student-accounts", {
+                      method: "PATCH",
+                      body: JSON.stringify({
+                        studentId: editing.id,
+                        revoke: true,
+                      }),
+                    });
+                    toast.success(`Revoked login for ${editing.name}`);
+                    setEditing(null);
+                    await refetchStudents(true);
+                  } catch (err) {
+                    toast.error(
+                      err instanceof Error
+                        ? err.message
+                        : "Failed to revoke credentials"
+                    );
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+              >
+                Revoke login
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setEditing(null)}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
             <Button
               className="bg-emerald-600 text-white hover:bg-emerald-700"
               onClick={() => void handleSave()}
@@ -574,6 +614,7 @@ export function StudentAccountsPanel() {
               ) : null}
               {saving ? "Saving..." : "Save"}
             </Button>
+          </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

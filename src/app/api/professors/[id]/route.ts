@@ -52,8 +52,13 @@ export async function PATCH(
     if (!professor) return notFound("Professor not found");
 
     if (data.username && data.username !== professor.username) {
-      const duplicate = await db.professor.findUnique({ where: { username: data.username } });
-      if (duplicate) return conflict("An account with this username already exists");
+      const [dupProf, dupStudent] = await Promise.all([
+        db.professor.findUnique({ where: { username: data.username } }),
+        db.student.findUnique({ where: { username: data.username } }),
+      ]);
+      if (dupProf || dupStudent) {
+        return conflict("An account with this username already exists");
+      }
     }
 
     const updated = await db.professor.update({

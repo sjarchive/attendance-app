@@ -272,7 +272,7 @@ export function ReportsView({
       setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
-      setSortDir(key === "rollNo" || key === "name" ? "asc" : "asc");
+      setSortDir(key === "rollNo" || key === "name" ? "asc" : "desc");
     }
   }
 

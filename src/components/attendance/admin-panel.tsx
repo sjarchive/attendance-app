@@ -330,7 +330,7 @@ export function AdminPanel({
       setIssuedCredentials({
         title: "Account created",
         recipientName: name,
-        username,
+        username: username.toLowerCase(),
         password,
         note: `Share these credentials with ${name} in person — they are not sent electronically.`,
       });

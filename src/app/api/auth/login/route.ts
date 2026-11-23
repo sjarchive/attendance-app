@@ -30,7 +30,10 @@ export async function POST(request: NextRequest) {
   const { username, password } = parsed.data;
 
   // Rate limit per IP + username (plan Step 8)
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  const ip =
+    request.headers.get("cf-connecting-ip")?.trim() ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "local";
   const rl = checkRateLimit(`login:${ip}:${username}`, 10, 5 * 60 * 1000);
   if (!rl.ok) {
     return NextResponse.json(

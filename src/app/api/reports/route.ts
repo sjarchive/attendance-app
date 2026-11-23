@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
         id: course.id,
         code: course.code,
         title: course.title,
-        programName: "",
+        programName: course.program.name,
       },
       from: from ?? null,
       to: to ?? null,

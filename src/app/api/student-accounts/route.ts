@@ -7,8 +7,8 @@ import { json, badRequest, conflict, notFound, serverError } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
 import type { StudentAccountView } from "@/lib/types";
 
-// GET /api/student-accounts?programId=... — students of a program with their
-// self-view credential status (admin only, Phase 2)
+const USERNAME_RE = /^[a-z0-9][a-z0-9._-]*$/;
+
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin();
   if (isErrorResponse(auth)) return auth.response;
@@ -25,14 +25,19 @@ export async function GET(request: NextRequest) {
       orderBy: { rollNo: "asc" },
     });
 
-    const payload: StudentAccountView[] = students.map((s) => ({
-      id: s.id,
-      rollNo: s.rollNo,
-      name: s.name,
-      username: s.username,
-      hasPassword: Boolean(s.passwordHash),
-      activeEnrollments: s._count.enrollments,
-    }));
+    const payload: StudentAccountView[] = students
+      .map((s) => ({
+        id: s.id,
+        rollNo: s.rollNo,
+        name: s.name,
+        username: s.username,
+        hasPassword: Boolean(s.passwordHash),
+        activeEnrollments: s._count.enrollments,
+      }))
+      .sort((a, b) =>
+        a.rollNo.localeCompare(b.rollNo, undefined, { numeric: true })
+      );
+
     return json({ students: payload });
   } catch (e) {
     console.error(e);
@@ -48,14 +53,20 @@ const patchSchema = z.object({
     .toLowerCase()
     .min(3, "Username must be at least 3 characters")
     .max(40, "Username must be at most 40 characters")
-    .regex(/^[a-z0-9][a-z0-9._-]*$/, "Only letters, numbers, dots, hyphens, and underscores are allowed")
+    .regex(
+      USERNAME_RE,
+      "Only letters, numbers, dots, hyphens, and underscores are allowed"
+    )
     .or(z.literal(""))
     .optional(),
-  password: z.string().min(6, "Password must be at least 6 characters").max(72).optional(),
+  password: z
+    .string()
+    .min(6, "Password must be at least 6 characters")
+    .max(72)
+    .optional(),
+  revoke: z.boolean().optional(),
 });
 
-// PATCH /api/student-accounts — set or revoke a student's self-view
-// credentials (admin only). Send username: "" to clear the username.
 export async function PATCH(request: NextRequest) {
   const auth = await requireAdmin();
   if (isErrorResponse(auth)) return auth.response;
@@ -66,18 +77,19 @@ export async function PATCH(request: NextRequest) {
   } catch {
     return badRequest("Invalid request body");
   }
-
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
     return badRequest(parsed.error.issues[0]?.message ?? "Invalid input");
   }
-  const { studentId, username, password } = parsed.data;
+  const { studentId, username, password, revoke } = parsed.data;
 
   try {
     const student = await db.student.findUnique({ where: { id: studentId } });
     if (!student) return notFound("Student not found");
 
-    if (username !== undefined && username !== "") {
+    const isRevoking = revoke === true || (username === "" && !password);
+
+    if (!isRevoking && username !== undefined && username !== "") {
       const clashStudent = await db.student.findUnique({ where: { username } });
       if (clashStudent && clashStudent.id !== studentId) {
         return conflict("This username is already used by another student");
@@ -90,15 +102,25 @@ export async function PATCH(request: NextRequest) {
 
     const updated = await db.student.update({
       where: { id: studentId },
-      data: {
-        ...(username !== undefined ? { username: username === "" ? null : username } : {}),
-        ...(password ? { passwordHash: await hashPassword(password) } : {}),
+      data: isRevoking
+        ? { username: null, passwordHash: null }
+        : {
+            ...(username !== undefined
+              ? { username: username === "" ? null : username }
+              : {}),
+            ...(password ? { passwordHash: await hashPassword(password) } : {}),
+          },
+      select: {
+        id: true,
+        rollNo: true,
+        name: true,
+        username: true,
+        passwordHash: true,
       },
-      select: { id: true, rollNo: true, name: true, username: true, passwordHash: true },
     });
 
     await logAudit({
-      action: "SET_STUDENT_CREDENTIALS",
+      action: isRevoking ? "REVOKE_STUDENT_CREDENTIALS" : "SET_STUDENT_CREDENTIALS",
       entityType: "student_account",
       entityId: updated.id,
       entityLabel: `${updated.name} (${updated.rollNo})`,
@@ -116,7 +138,7 @@ export async function PATCH(request: NextRequest) {
       username: updated.username,
       hasPassword: Boolean(updated.passwordHash),
       activeEnrollments: await db.enrollment.count({
-        where: { studentId: studentId, active: true },
+        where: { studentId, active: true },
       }),
     };
     return json({ student: view });
@@ -128,10 +150,6 @@ export async function PATCH(request: NextRequest) {
 
 const bulkSchema = z.object({ programId: z.string().min(1) });
 
-// POST /api/student-accounts — bulk-enable self-view logins for a program
-// (admin only). Students without credentials get username = their roll
-// number (lowercase) and password = their roll number, so the HoD can
-// announce the pattern.
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin();
   if (isErrorResponse(auth)) return auth.response;
@@ -142,7 +160,6 @@ export async function POST(request: NextRequest) {
   } catch {
     return badRequest("Invalid request body");
   }
-
   const parsed = bulkSchema.safeParse(body);
   if (!parsed.success) {
     return badRequest(parsed.error.issues[0]?.message ?? "Invalid input");
@@ -161,11 +178,16 @@ export async function POST(request: NextRequest) {
     const skipped: string[] = [];
 
     for (const s of students) {
-      const username = s.rollNo.toLowerCase();
-      const clash =
-        (await db.student.findUnique({ where: { username } })) ??
-        (await db.professor.findUnique({ where: { username } }));
-      if (clash) {
+      const username = s.rollNo.trim().toLowerCase();
+      if (username.length < 3 || username.length > 40 || !USERNAME_RE.test(username)) {
+        skipped.push(s.rollNo);
+        continue;
+      }
+      const [clashStudent, clashProfessor] = await Promise.all([
+        db.student.findUnique({ where: { username } }),
+        db.professor.findUnique({ where: { username } }),
+      ]);
+      if ((clashStudent && clashStudent.id !== s.id) || clashProfessor) {
         skipped.push(s.rollNo);
         continue;
       }

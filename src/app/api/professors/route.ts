@@ -65,8 +65,13 @@ export async function POST(request: NextRequest) {
   const { name, username, password, role } = parsed.data;
 
   try {
-    const exists = await db.professor.findUnique({ where: { username } });
-    if (exists) return conflict("An account with this username already exists");
+    const [existsProf, existsStudent] = await Promise.all([
+      db.professor.findUnique({ where: { username } }),
+      db.student.findUnique({ where: { username } }),
+    ]);
+    if (existsProf || existsStudent) {
+      return conflict("An account with this username already exists");
+    }
 
     const professor = await db.professor.create({
       data: { name, username, passwordHash: await hashPassword(password), role },
