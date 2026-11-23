@@ -281,16 +281,29 @@ export default function Home() {
     [activeCourse, commitView]
   );
 
+  // Lock scroll while the splash/loading screen is shown
+  useEffect(() => {
+    if (!booting) return;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+    };
+  }, [booting]);
+
   // ---- Boot screen -------------------------------------------------------
   if (booting) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3">
+      <div className="fixed inset-0 z-50 flex h-dvh w-screen flex-col items-center justify-center gap-3 overflow-hidden overscroll-none touch-none bg-background select-none">
         <GraduationCap
           className="h-8 w-8 text-emerald-600 dark:text-emerald-400"
           aria-hidden="true"
         />
         <p className="text-sm text-muted-foreground">
-          Loading attendance system...
+          Loading Attendance Tracker...
         </p>
       </div>
     );
@@ -348,8 +361,7 @@ export default function Home() {
                 aria-hidden="true"
               />
               <span className="text-sm font-semibold tracking-tight">
-                <span className="sm:hidden">Attendance</span>
-                <span className="hidden sm:inline">Department Attendance</span>
+                Attendance Tracker
               </span>
             </div>
           ) : (
@@ -359,15 +371,14 @@ export default function Home() {
                 navigateWithGuard(() => commitView({ name: "dashboard" }))
               }
               className="flex shrink-0 items-center gap-2 rounded-md py-1 pr-1 text-left whitespace-nowrap transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Department Attendance — Go to Dashboard"
+              aria-label="Attendance Tracker — Go to Dashboard"
             >
               <GraduationCap
                 className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
                 aria-hidden="true"
               />
               <span className="text-sm font-semibold tracking-tight">
-                <span className="sm:hidden">Attendance</span>
-                <span className="hidden sm:inline">Department Attendance</span>
+                Attendance Tracker
               </span>
             </button>
           )}
@@ -516,7 +527,7 @@ export default function Home() {
       >
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
           <p className="text-xs text-muted-foreground">
-            Department of Education · Attendance System
+            Department of Education
           </p>
         </div>
       </footer>

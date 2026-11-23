@@ -15,7 +15,7 @@ const appMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Department Attendance Tracker",
+  title: "Attendance Tracker",
   description:
     "Daily student attendance tracking for college departments — professors mark attendance per course, admins manage accounts, programs and courses.",
   keywords: ["attendance", "college", "department", "professor", "student"],

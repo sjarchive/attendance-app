@@ -1,4 +1,4 @@
-# Department Attendance Tracker
+# Attendance Tracker
 
 A student attendance tracking app for a college department. Professors mark daily
 attendance per course, manage rosters, and review reports with CSV export. An ADMIN
