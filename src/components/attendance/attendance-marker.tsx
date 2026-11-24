@@ -852,7 +852,7 @@ export function AttendanceMarker({
       {/* Compact sticky save footer */}
       <div
         data-theme-pin-sticky
-        className="sticky bottom-0 z-30 -mx-4 isolate border-t bg-background px-4 py-2.5"
+        className="sticky bottom-0 z-30 -mx-4 border-t bg-background/95 px-4 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-background/85"
       >
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground tabular-nums sm:text-sm">
