@@ -319,16 +319,10 @@ export default function Home() {
             />
           </span>
         </div>
-        <div className="flex flex-col items-center gap-2.5">
+        <div className="flex flex-col items-center gap-1">
           <p className="text-sm font-semibold tracking-tight text-foreground">
             Attendance Tracker
           </p>
-          <div
-            aria-hidden="true"
-            className="h-1 w-36 overflow-hidden rounded-full bg-muted"
-          >
-            <div className="splash-progress-bar h-full w-1/2 rounded-full bg-gradient-to-r from-emerald-500/60 via-emerald-600 to-emerald-500/60 dark:from-emerald-400/60 dark:via-emerald-400 dark:to-emerald-400/60" />
-          </div>
           <p className="text-xs text-muted-foreground">
             Loading workspace...
           </p>

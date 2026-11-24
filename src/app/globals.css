@@ -179,19 +179,7 @@ html.theme-switching *::after {
   }
 }
 
-/* Splash screen loading animations */
-@keyframes splash-progress {
-  0% {
-    transform: translateX(-100%);
-  }
-  50% {
-    transform: translateX(65%);
-  }
-  100% {
-    transform: translateX(220%);
-  }
-}
-
+/* Splash screen loading animation */
 @keyframes splash-halo {
   0%,
   100% {
@@ -204,16 +192,11 @@ html.theme-switching *::after {
   }
 }
 
-.splash-progress-bar {
-  animation: splash-progress 1.35s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
 .splash-halo-ring {
   animation: splash-halo 1.8s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .splash-progress-bar,
   .splash-halo-ring {
     animation: none !important;
   }
