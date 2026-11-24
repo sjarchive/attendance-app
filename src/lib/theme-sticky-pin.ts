@@ -1,3 +1,5 @@
+export type StickyEdge = "top" | "bottom";
+
 export interface RectLike {
   top: number;
   left: number;
@@ -6,45 +8,59 @@ export interface RectLike {
 }
 
 export interface PinMetricsInput {
+  edge: StickyEdge;
   elementRect: RectLike;
   parentRect: RectLike;
   parentBorderTop: number;
   parentBorderLeft: number;
+  parentPaddingTop: number;
   parentPaddingBottom: number;
   elementMarginTop: number;
   elementMarginBottom: number;
 }
 
 export interface PinMetrics {
+  edge: StickyEdge;
   top: number;
   left: number;
   width: number;
   height: number;
+  parentPaddingTop: number;
   parentPaddingBottom: number;
 }
 
 /**
  * Computes exact parent-relative coordinates to temporarily freeze a
- * position:sticky bar as position:absolute during document.startViewTransition().
+ * position:sticky bar (top header or bottom action bar) as position:absolute
+ * during document.startViewTransition().
  *
- * Mobile Chromium (Chrome/Brave Android) expands the View Transition Snapshot
- * Containing Block behind dynamic browser chrome and can drop or shift
- * actively-stuck bottom sticky elements, making them disappear for the duration
- * of the transition and pop back afterwards. Freezing the element in document
- * coordinates while preserving parent height avoids both layout shift and
- * sticky-snapshot glitches.
+ * Mobile Chromium (Chrome/Brave Android) can drop or shift actively-stuck
+ * position:sticky elements during the root View Transition snapshot, making
+ * them disappear until the transition finishes. Freezing the element in
+ * document coordinates while preserving parent flow height via paddingTop
+ * (for top bars) or paddingBottom (for bottom bars) avoids both layout shift
+ * and sticky-snapshot glitches.
  */
 export function computeAbsolutePinMetrics(input: PinMetricsInput): PinMetrics {
+  const flowHeight =
+    input.elementRect.height +
+    input.elementMarginTop +
+    input.elementMarginBottom;
+
   return {
+    edge: input.edge,
     top: input.elementRect.top - input.parentRect.top - input.parentBorderTop,
     left: input.elementRect.left - input.parentRect.left - input.parentBorderLeft,
     width: input.elementRect.width,
     height: input.elementRect.height,
+    parentPaddingTop:
+      input.edge === "top"
+        ? input.parentPaddingTop + flowHeight
+        : input.parentPaddingTop,
     parentPaddingBottom:
-      input.parentPaddingBottom +
-      input.elementRect.height +
-      input.elementMarginTop +
-      input.elementMarginBottom,
+      input.edge === "bottom"
+        ? input.parentPaddingBottom + flowHeight
+        : input.parentPaddingBottom,
   };
 }
 
@@ -63,6 +79,7 @@ export function pinStickyElementsForViewTransition(
   const nodes = rootDoc.querySelectorAll<HTMLElement>("[data-theme-pin-sticky]");
   if (nodes.length === 0) return () => {};
 
+  const prevParentStyles = new Map<HTMLElement, string | null>();
   const restores: Array<() => void> = [];
 
   // Read all geometry before mutating styles to avoid layout thrashing
@@ -72,7 +89,6 @@ export function pinStickyElementsForViewTransition(
     metrics: PinMetrics;
     parentWasStatic: boolean;
     prevElStyle: string | null;
-    prevParentStyle: string | null;
   }> = [];
 
   for (const el of nodes) {
@@ -85,18 +101,27 @@ export function pinStickyElementsForViewTransition(
     const elementRect = el.getBoundingClientRect();
     if (elementRect.width <= 0 || elementRect.height <= 0) continue;
 
+    const attr = el.getAttribute("data-theme-pin-sticky");
+    const edge: StickyEdge = attr === "top" ? "top" : "bottom";
+
     const parentRect = parent.getBoundingClientRect();
     const parentCs = window.getComputedStyle(parent);
 
     const metrics = computeAbsolutePinMetrics({
+      edge,
       elementRect,
       parentRect,
       parentBorderTop: parseFloat(parentCs.borderTopWidth) || 0,
       parentBorderLeft: parseFloat(parentCs.borderLeftWidth) || 0,
+      parentPaddingTop: parseFloat(parentCs.paddingTop) || 0,
       parentPaddingBottom: parseFloat(parentCs.paddingBottom) || 0,
       elementMarginTop: parseFloat(elCs.marginTop) || 0,
       elementMarginBottom: parseFloat(elCs.marginBottom) || 0,
     });
+
+    if (!prevParentStyles.has(parent)) {
+      prevParentStyles.set(parent, parent.getAttribute("style"));
+    }
 
     plans.push({
       el,
@@ -104,18 +129,20 @@ export function pinStickyElementsForViewTransition(
       metrics,
       parentWasStatic: parentCs.position === "static",
       prevElStyle: el.getAttribute("style"),
-      prevParentStyle: parent.getAttribute("style"),
     });
   }
 
   for (const plan of plans) {
-    const { el, parent, metrics, parentWasStatic, prevElStyle, prevParentStyle } =
-      plan;
+    const { el, parent, metrics, parentWasStatic, prevElStyle } = plan;
 
     if (parentWasStatic) {
       parent.style.position = "relative";
     }
-    parent.style.paddingBottom = `${metrics.parentPaddingBottom}px`;
+    if (metrics.edge === "top") {
+      parent.style.paddingTop = `${metrics.parentPaddingTop}px`;
+    } else {
+      parent.style.paddingBottom = `${metrics.parentPaddingBottom}px`;
+    }
 
     el.style.position = "absolute";
     el.style.top = `${metrics.top}px`;
@@ -128,7 +155,12 @@ export function pinStickyElementsForViewTransition(
 
     restores.push(() => {
       restoreInlineStyle(el, prevElStyle);
-      restoreInlineStyle(parent, prevParentStyle);
+    });
+  }
+
+  for (const [parent, prevStyle] of prevParentStyles.entries()) {
+    restores.push(() => {
+      restoreInlineStyle(parent, prevStyle);
     });
   }
 

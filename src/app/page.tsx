@@ -340,7 +340,7 @@ export default function Home() {
   const isStudent = user.role === "STUDENT";
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="relative flex min-h-screen flex-col">
       {/* Unsaved attendance guard for top-level header navigation */}
       <AlertDialog
         open={pendingNav !== null}
@@ -373,7 +373,10 @@ export default function Home() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+      <header
+        data-theme-pin-sticky="top"
+        className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85"
+      >
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4">
           {/* Brand button returns to Dashboard or scrolls to top when already on home screen */}
           <button
