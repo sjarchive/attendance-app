@@ -385,7 +385,7 @@ export function AttendanceMarker({
   const markedCount = roster.length - counts.unmarked;
 
   return (
-    <div className="space-y-4">
+    <div className="relative space-y-4">
       <Dialog open={activityOpen} onOpenChange={setActivityOpen}>
         <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
@@ -850,7 +850,10 @@ export function AttendanceMarker({
       </Card>
 
       {/* Compact sticky save footer */}
-      <div className="sticky bottom-0 z-30 -mx-4 border-t bg-background/95 px-4 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+      <div
+        data-theme-pin-sticky
+        className="sticky bottom-0 z-30 -mx-4 isolate border-t bg-background px-4 py-2.5"
+      >
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground tabular-nums sm:text-sm">
             <span className="font-medium text-foreground">{markedCount}</span>{" "}

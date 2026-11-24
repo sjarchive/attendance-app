@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { flushSync } from "react-dom";
+import { pinStickyElementsForViewTransition } from "@/lib/theme-sticky-pin";
 
 export type Theme = "light" | "dark";
 
@@ -56,6 +57,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   });
 
   const transitionIdRef = useRef(0);
+  const restorePinnedRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     applyThemeToDom(theme);
@@ -73,6 +75,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener("storage", onStorage);
+      restorePinnedRef.current?.();
+      restorePinnedRef.current = null;
       document.documentElement.classList.remove(SWITCHING_CLASS);
     };
   }, []);
@@ -89,12 +93,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Restore any prior pin before starting a new transition (handles rapid toggles)
+    restorePinnedRef.current?.();
+    restorePinnedRef.current = null;
+
     const root = document.documentElement;
     transitionIdRef.current += 1;
     const transitionId = transitionIdRef.current;
 
     const cleanup = () => {
       if (transitionIdRef.current === transitionId) {
+        restorePinnedRef.current?.();
+        restorePinnedRef.current = null;
         root.classList.remove(SWITCHING_CLASS);
       }
     };
@@ -111,6 +121,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const doc = document as DocumentWithViewTransition;
     if (!prefersReducedMotion && typeof doc.startViewTransition === "function") {
       try {
+        // Temporarily pin sticky bottom bars to their exact visual coordinates so
+        // mobile browsers do not hide or shift them during the root snapshot.
+        restorePinnedRef.current = pinStickyElementsForViewTransition(doc);
+        void root.offsetHeight;
+
         const vt = doc.startViewTransition(() => {
           applyThemeToDom(next);
           flushSync(() => {
@@ -121,6 +136,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         vt.finished.then(cleanup, cleanup);
         return;
       } catch {
+        restorePinnedRef.current?.();
+        restorePinnedRef.current = null;
         // Fall through to atomic single-frame switch if view transition fails
       }
     }
