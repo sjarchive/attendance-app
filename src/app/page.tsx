@@ -298,14 +298,41 @@ export default function Home() {
   // ---- Boot screen -------------------------------------------------------
   if (booting) {
     return (
-      <div className="fixed inset-0 z-50 flex h-dvh w-screen flex-col items-center justify-center gap-3 overflow-hidden overscroll-none touch-none bg-background select-none">
-        <GraduationCap
-          className="h-8 w-8 text-emerald-600 dark:text-emerald-400"
-          aria-hidden="true"
-        />
-        <p className="text-sm text-muted-foreground">
-          Loading Attendance Tracker...
-        </p>
+      <div
+        role="status"
+        aria-live="polite"
+        className="fixed inset-0 z-50 flex h-dvh w-screen flex-col items-center justify-center gap-5 overflow-hidden overscroll-none touch-none bg-background select-none"
+      >
+        <div className="relative flex h-16 w-16 items-center justify-center">
+          <span
+            aria-hidden="true"
+            className="splash-halo-ring absolute inset-0 rounded-full bg-emerald-500/20 dark:bg-emerald-400/20"
+          />
+          <span
+            aria-hidden="true"
+            className="absolute inset-0 animate-spin rounded-full border-2 border-emerald-600/15 border-t-emerald-600 motion-reduce:animate-none dark:border-emerald-400/20 dark:border-t-emerald-400 [animation-duration:1.1s]"
+          />
+          <span className="relative flex h-12 w-12 items-center justify-center rounded-full bg-card shadow-xs ring-1 ring-border">
+            <GraduationCap
+              className="h-6 w-6 text-emerald-600 dark:text-emerald-400"
+              aria-hidden="true"
+            />
+          </span>
+        </div>
+        <div className="flex flex-col items-center gap-2.5">
+          <p className="text-sm font-semibold tracking-tight text-foreground">
+            Attendance Tracker
+          </p>
+          <div
+            aria-hidden="true"
+            className="h-1 w-36 overflow-hidden rounded-full bg-muted"
+          >
+            <div className="splash-progress-bar h-full w-1/2 rounded-full bg-gradient-to-r from-emerald-500/60 via-emerald-600 to-emerald-500/60 dark:from-emerald-400/60 dark:via-emerald-400 dark:to-emerald-400/60" />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Loading workspace...
+          </p>
+        </div>
       </div>
     );
   }
