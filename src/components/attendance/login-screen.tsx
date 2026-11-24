@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-  ChevronDown,
   Eye,
   EyeOff,
   GraduationCap,
@@ -24,28 +23,15 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { apiFetch } from "@/lib/client";
 import type { SessionUser } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 interface LoginScreenProps {
   onLogin: (user: SessionUser) => void;
 }
 
-const DEMO_ACCOUNTS = [
-  { label: "Administrator (HoD)", username: "admin", password: "admin123" },
-  { label: "Professor", username: "meera", password: "prof123" },
-  { label: "Professor", username: "rajesh", password: "prof123" },
-  {
-    label: "Student (read-only)",
-    username: "bed-01",
-    password: "BED-01",
-  },
-];
-
 export function LoginScreen({ onLogin }: LoginScreenProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [demoOpen, setDemoOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -171,58 +157,6 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
             </form>
           </CardContent>
         </Card>
-
-        <div className="rounded-lg border bg-muted/30">
-          <button
-            type="button"
-            aria-expanded={demoOpen}
-            aria-controls="demo-accounts-panel"
-            onClick={() => setDemoOpen((prev) => !prev)}
-            className="flex w-full items-center justify-between px-4 py-3 text-left text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
-          >
-            <span>Demo accounts</span>
-            <ChevronDown
-              className={cn(
-                "h-4 w-4 transition-transform duration-150",
-                demoOpen && "rotate-180"
-              )}
-              aria-hidden="true"
-            />
-          </button>
-          {demoOpen && (
-            <div id="demo-accounts-panel" className="border-t px-3 pb-3 pt-2">
-              <ul className="space-y-1">
-                {DEMO_ACCOUNTS.map((acc) => (
-                  <li key={acc.username}>
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      onClick={() => {
-                        setUsername(acc.username);
-                        setPassword(acc.password);
-                        setError(null);
-                      }}
-                    >
-                      <span className="truncate">
-                        <span className="font-mono font-medium text-foreground">
-                          {acc.username}
-                        </span>
-                        <span className="mx-1.5 text-border">·</span>
-                        <span className="font-mono">{acc.password}</span>
-                      </span>
-                      <span className="shrink-0 text-[11px] text-muted-foreground">
-                        {acc.label}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2 px-2 text-[11px] text-muted-foreground">
-                Click any row to pre-fill credentials.
-              </p>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );
